@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block extrastyle %}{{ block.super }}
+<style>
+#header .nc-reports{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;margin-right:14px;border-radius:6px;background:#fff;color:var(--primary)!important;font-weight:700;text-decoration:none;border:0}
+#header .nc-reports:hover{background:var(--secondary);color:#fff!important}
+</style>{% endblock %}
+{% block usertools %}
+{% if has_permission %}
+<div id="user-tools" style="display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px">
+<a href="{% url 'reports' %}" class="nc-reports">📊 Ҳисоботлар</a>
+<span>{% block welcome-msg %}{% translate 'Welcome,' %} <strong>{% firstof user.get_short_name user.get_username %}</strong>.{% endblock %}
+{% block userlinks %}{{ block.super }}{% endblock %}</span>
+</div>
+{% endif %}
+{% endblock %}

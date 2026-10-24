@@ -36,13 +36,13 @@ CSRF_COOKIE_SECURE = True
 # Application definition
 
 INSTALLED_APPS = [
+    'content',  # админ шаблонларини (Ҳисоботлар тугмаси) устидан ёзиши учун биринчи турибди
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'content',
 ]
 
 MIDDLEWARE = [
