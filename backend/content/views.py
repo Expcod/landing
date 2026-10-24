@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import cache_control
 
-from .models import Case, Client, Lead, Reel, Screen, SiteSettings
+from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
 
 
 def url(f):
@@ -57,4 +57,69 @@ def lead(request):
         business=str(d.get('business', ''))[:200], problem=str(d.get('problem', ''))[:5000],
         page=str(d.get('page', ''))[:500],
     )
+    return JsonResponse({'ok': True})
+
+
+SECTIONS = ['top', 'how', 'camera', 'screens', 'cases', 'reels', 'audit', 'contact']
+EVENTS = {'video_start', 'video_50', 'video_complete', 'video_unmute', 'video_swipe', 'form_view', 'form_start',
+          'lead_sent', 'click_phone', 'click_telegram', 'click_instagram', 'click_cta'}
+BOT = re.compile(r'bot|crawl|spider|slurp|preview|headless|lighthouse|facebookexternalhit', re.I)
+
+
+def _source(d):
+    src = str(d.get('utm_source') or '').strip().lower()
+    if src:
+        return src[:100]
+    ref = str(d.get('referrer') or '')
+    m = re.match(r'https?://([^/]+)', ref)
+    if not m or 'novacode.uz' in m.group(1):
+        return 'тўғридан-тўғри'
+    host = m.group(1).lower().removeprefix('www.').removeprefix('m.').removeprefix('l.').removeprefix('lm.')
+    for k in ('instagram', 'facebook', 'google', 'yandex', 't.me', 'telegram', 'youtube'):
+        if k in host:
+            return 'telegram' if k == 't.me' else k
+    return host[:100]
+
+
+@csrf_exempt
+@require_POST
+def track(request):
+    """sendBeacon орқали келади: {sid, vid, t: 'start'|'ping'|'event', ...}"""
+    try:
+        d = json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False}, status=400)
+    ua = request.META.get('HTTP_USER_AGENT', '')
+    sid, vid = str(d.get('sid', ''))[:40], str(d.get('vid', ''))[:40]
+    if not re.fullmatch(r'[\w-]{8,40}', sid) or not re.fullmatch(r'[\w-]{8,40}', vid) or BOT.search(ua):
+        return JsonResponse({'ok': False}, status=400)
+    t = d.get('t')
+    if t == 'start':
+        ip = (request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR') or '').split(',')[0].strip() or None
+        if ip and Visit.objects.filter(ip=ip, started__gte=timezone.now() - timedelta(hours=1)).count() >= 60:
+            return JsonResponse({'ok': False}, status=429)
+        Visit.objects.get_or_create(sid=sid, defaults=dict(
+            vid=vid, ip=ip, ua=ua[:300], referrer=str(d.get('referrer', ''))[:300], source=_source(d),
+            campaign=str(d.get('utm_campaign') or '')[:150],
+            device='mobile' if re.search(r'Mobi|Android|iPhone', ua) else 'desktop',
+            last_section='top', max_section='top',
+        ))
+        return JsonResponse({'ok': True})
+    v = Visit.objects.filter(sid=sid).first()
+    if not v or v.started < timezone.now() - timedelta(hours=6):
+        return JsonResponse({'ok': False}, status=404)
+    if t == 'ping':
+        v.duration = max(v.duration, min(int(d.get('dur') or 0), 6 * 3600))
+        v.max_scroll = max(v.max_scroll, min(int(d.get('scroll') or 0), 100))
+        sec = d.get('sec')
+        if sec in SECTIONS:
+            v.last_section = sec
+        mx = d.get('maxsec')
+        if mx in SECTIONS and SECTIONS.index(mx) > SECTIONS.index(v.max_section or 'top'):
+            v.max_section = mx
+        v.save()
+    elif t == 'event' and d.get('name') in EVENTS:
+        if v.events.count() < 200:
+            Event.objects.create(visit=v, name=d['name'], label=str(d.get('label') or '')[:200])
+        v.save(update_fields=['last_seen'])
     return JsonResponse({'ok': True})

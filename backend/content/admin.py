@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Case, Client, Lead, Reel, Screen, SiteSettings
+from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
 
 admin.site.site_header = 'Nova Code — landing'
 admin.site.site_title = 'Nova Code landing'
@@ -70,3 +70,36 @@ class SiteSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+class EventInline(admin.TabularInline):
+    model = Event
+    extra = 0
+    can_delete = False
+    readonly_fields = ['created', 'name', 'label']
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Visit)
+class VisitAdmin(admin.ModelAdmin):
+    list_display = ['started', 'source', 'campaign', 'device', 'duration_fmt', 'max_scroll', 'last_section', 'got_lead']
+    list_filter = ['source', 'device', 'last_section', 'started']
+    search_fields = ['source', 'campaign', 'referrer', 'ip']
+    inlines = [EventInline]
+
+    def get_readonly_fields(self, request, obj=None):
+        return [f.name for f in Visit._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description='Вақт')
+    def duration_fmt(self, o):
+        return '%d:%02d' % divmod(o.duration, 60)
+
+    @admin.display(description='Ариза', boolean=True)
+    def got_lead(self, o):
+        return o.events.filter(name='lead_sent').exists()

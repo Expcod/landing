@@ -218,3 +218,52 @@
     if (d.reels) reels(d.reels);
   }).catch(function () { /* API ишламаса, ҳозирги HTML қолади */ });
 })();
+
+/* Ўз аналитикамиз (admin → Ҳисоботлар): ташриф, вақт, скролл, бўлим, мақсадлар → /api/track/ */
+(function () {
+  var rid = function () { return (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)); };
+  var store = function (st, k) {
+    try { var v = st.getItem(k); if (!v) { v = rid(); st.setItem(k, v); } return v; } catch (e) { return rid(); }
+  };
+  var vid = store(window.localStorage, 'nc_vid'), sid = store(window.sessionStorage, 'nc_sid');
+  var send = function (o) {
+    o.sid = sid; o.vid = vid;
+    var body = JSON.stringify(o);
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon('/api/track/', new Blob([body], { type: 'text/plain' }))) return;
+    } catch (e) {}
+    try { fetch('/api/track/', { method: 'POST', body: body, keepalive: true }); } catch (e) {}
+  };
+
+  var q = new URLSearchParams(location.search);
+  send({ t: 'start', referrer: document.referrer, utm_source: q.get('utm_source') || '', utm_campaign: q.get('utm_campaign') || '' });
+
+  // Мақсадлар: Метрика ва Pixel'га кетаётган ҳар бир ҳодиса бизга ҳам ёзилади
+  var orig = window.ncGoal;
+  window.ncGoal = function (name, params) {
+    if (orig) orig(name, params);
+    send({ t: 'event', name: name, label: (params && params.video) || '' });
+  };
+
+  var SECS = ['top', 'how', 'camera', 'screens', 'cases', 'reels', 'audit', 'contact'];
+  var secs = SECS.map(function (id) { return document.getElementById(id); });
+  var maxScroll = 0, maxSec = 0, curSec = 0, active = 0, since = document.visibilityState === 'visible' ? Date.now() : 0;
+  function measure() {
+    var h = document.documentElement.scrollHeight, y = window.scrollY + window.innerHeight;
+    maxScroll = Math.max(maxScroll, Math.min(100, Math.round(y * 100 / (h || 1))));
+    var mid = window.innerHeight * 0.5;
+    secs.forEach(function (el, i) { if (el && el.getBoundingClientRect().top < mid) curSec = i; });
+    if (curSec > maxSec) maxSec = curSec;
+  }
+  function spent() { return Math.round((active + (since ? Date.now() - since : 0)) / 1000); }
+  function ping() { measure(); send({ t: 'ping', dur: spent(), scroll: maxScroll, sec: SECS[curSec], maxsec: SECS[maxSec] }); }
+
+  var tm; window.addEventListener('scroll', function () { clearTimeout(tm); tm = setTimeout(measure, 150); }, { passive: true });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { if (since) { active += Date.now() - since; since = 0; } ping(); }
+    else since = Date.now();
+  });
+  window.addEventListener('pagehide', ping);
+  setInterval(function () { if (document.visibilityState === 'visible') ping(); }, 15000);
+  setTimeout(ping, 3000);
+})();

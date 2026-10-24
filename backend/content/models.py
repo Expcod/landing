@@ -112,3 +112,39 @@ class SiteSettings(models.Model):
     @classmethod
     def get(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class Visit(models.Model):
+    """Сайтга битта кириш (сессия). Маълумот сайтдаги content.js'дан келади."""
+    sid = models.CharField(max_length=40, unique=True)
+    vid = models.CharField('Меҳмон', max_length=40, db_index=True)
+    started = models.DateTimeField('Кирган вақти', auto_now_add=True, db_index=True)
+    last_seen = models.DateTimeField('Охирги фаоллик', auto_now=True)
+    duration = models.PositiveIntegerField('Сайтда вақт, сек', default=0)
+    max_scroll = models.PositiveSmallIntegerField('Қаергача тушди, %', default=0)
+    last_section = models.CharField('Чиқиб кетган бўлим', max_length=30, blank=True)
+    max_section = models.CharField('Энг пастки бўлим', max_length=30, blank=True)
+    source = models.CharField('Манба', max_length=100, blank=True)
+    campaign = models.CharField('Кампания', max_length=150, blank=True)
+    referrer = models.CharField(max_length=300, blank=True)
+    device = models.CharField('Қурилма', max_length=10, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    ua = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ['-started']
+        verbose_name = 'Ташриф'
+        verbose_name_plural = 'Ташрифлар'
+
+    def __str__(self):
+        return f'{self.started:%d.%m %H:%M} {self.source}'
+
+
+class Event(models.Model):
+    visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name='events')
+    name = models.CharField(max_length=40, db_index=True)
+    label = models.CharField(max_length=200, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created']

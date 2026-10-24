@@ -1,0 +1,80 @@
+{% extends "admin/base_site.html" %}
+{% block extrastyle %}{{ block.super }}
+<style>
+.rp{max-width:1200px}
+.rp-tabs{display:flex;gap:6px;margin:0 0 20px}
+.rp-tabs a{padding:6px 14px;border-radius:6px;border:1px solid var(--hairline-color);text-decoration:none}
+.rp-tabs a.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.kpi{border:1px solid var(--hairline-color);border-radius:8px;padding:14px 16px}
+.kpi b{display:block;font-size:26px;margin-top:4px;color:var(--body-fg)}
+.kpi span{color:var(--body-quiet-color);font-size:13px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:24px}
+.rp h2{margin:28px 0 6px;font-size:16px}
+.rp p.hint{margin:0 0 10px;color:var(--body-quiet-color)}
+.rp table{width:100%}
+.rp td.num,.rp th.num{text-align:right;white-space:nowrap}
+.bar{height:10px;border-radius:5px;background:var(--primary);opacity:.75;min-width:2px}
+.bar.g{background:#23A575}.bar.r{background:#E5484D}
+.lost{color:#E5484D;font-size:12px}
+.empty{padding:40px;text-align:center;color:var(--body-quiet-color);border:1px dashed var(--hairline-color);border-radius:8px}
+</style>{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Бош саҳифа</a> › Ҳисоботлар</div>{% endblock %}
+{% block content %}
+<div class="rp">
+<div class="rp-tabs">{% for k, v in periods.items %}<a href="?d={{ k }}" class="{% if k == period %}on{% endif %}">{{ v }}</a>{% endfor %}</div>
+<div class="kpis">{% for name, val in kpi %}<div class="kpi"><span>{{ name }}</span><b>{{ val }}</b></div>{% endfor %}</div>
+{% if not funnel.0.n %}<div class="empty">Бу давр учун ҳали ташриф йўқ. Маълумот сайтга кирилган заҳоти пайдо бўлади.</div>{% else %}
+
+<h2>Воронка: меҳмон қаергача боряпти</h2>
+<p class="hint">Ҳар бир қадамга етган ташрифлар сони ва нечтаси шу қадамда тушиб қолгани.</p>
+<table><thead><tr><th>Қадам</th><th class="num">Ташриф</th><th class="num">%</th><th style="width:45%"></th></tr></thead><tbody>
+{% for r in funnel %}<tr><td>{{ r.name }}{% if r.lost > 0 %} <span class="lost">−{{ r.lost }}</span>{% endif %}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.pct }}%</td><td><div class="bar g" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+</tbody></table>
+
+<div class="grid2">
+<div><h2>Саҳифада қаергача тушди ва қаерда чиқиб кетди</h2>
+<p class="hint">«Етди» — шу бўлимни кўрганлар. «Чиқди» — сайтни шу бўлимда ёпганлар.</p>
+<table><thead><tr><th>Бўлим</th><th class="num">Етди</th><th style="width:35%"></th><th class="num">Чиқди</th></tr></thead><tbody>
+{% for r in depth %}<tr><td>{{ r.name }}</td><td class="num">{{ r.reach_pct }}%</td><td><div class="bar" style="width:{{ r.bar }}%"></div></td><td class="num">{{ r.exit }} ({{ r.exit_pct }}%)</td></tr>{% endfor %}
+</tbody></table></div>
+
+<div><h2>Сайтда қанча вақт қолди</h2>
+<p class="hint">Саҳифа очиқ ва экранда турган вақт.</p>
+<table><tbody>{% for r in times %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.pct }}%</td><td style="width:40%"><div class="bar" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+<h2>Видеолар</h2>
+<p class="hint">Нечта ташрифда видео бошланди, ярмигача ва охиригача кўрилди.</p>
+{% if videos %}<table><thead><tr><th>Видео</th><th class="num">Бошлади</th><th class="num">Ярмигача</th><th class="num">Охиригача</th><th class="num">Овоз ёқди</th><th class="num">Охиригача, %</th></tr></thead><tbody>
+{% for r in videos %}<tr><td>{{ r.name }}</td><td class="num">{{ r.video_start|default:0 }}</td><td class="num">{{ r.video_50|default:0 }}</td><td class="num">{{ r.video_complete|default:0 }}</td><td class="num">{{ r.video_unmute|default:0 }}</td><td class="num">{{ r.done_pct }}%</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="hint">Ҳали видео кўрилмаган.</p>{% endif %}
+
+<div class="grid2">
+<div><h2>Қаердан келди (манба)</h2>
+<p class="hint">Рекламада UTM тег бўлса (utm_source) — шу ном, бўлмаса қайси сайтдан ўтгани.</p>
+<table><thead><tr><th>Манба</th><th class="num">Ташриф</th><th class="num">Ариза</th><th class="num">Конв.</th><th style="width:30%"></th></tr></thead><tbody>
+{% for r in sources %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.conv }}%</td><td><div class="bar" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+</tbody></table>
+<h2>Кампаниялар (utm_campaign)</h2>
+<table><thead><tr><th>Кампания</th><th class="num">Ташриф</th><th class="num">Ариза</th><th class="num">Конв.</th></tr></thead><tbody>
+{% for r in campaigns %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.conv }}%</td></tr>{% endfor %}
+</tbody></table></div>
+
+<div><h2>Қурилма</h2>
+<table><thead><tr><th></th><th class="num">Ташриф</th><th class="num">Ариза</th><th class="num">Конв.</th></tr></thead><tbody>
+{% for r in devices %}<tr><td>{% if r.name == 'mobile' %}Телефон{% elif r.name == 'desktop' %}Компьютер{% else %}{{ r.name }}{% endif %}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.conv }}%</td></tr>{% endfor %}
+</tbody></table>
+<h2>Босишлар</h2>
+<p class="hint">Нечта ташрифда шу тугма босилди.</p>
+<table><tbody>{% for r in clicks %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td></tr>{% endfor %}</tbody></table></div>
+</div>
+
+<h2>Кунлар бўйича</h2>
+<table><thead><tr><th>Кун</th><th class="num">Ташриф</th><th class="num">Ариза</th><th style="width:55%"></th></tr></thead><tbody>
+{% for r in daily %}<tr><td>{{ r.day|date:"d.m.Y" }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td><div class="bar" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+</tbody></table>
+<p class="hint" style="margin-top:20px"><a href="{% url 'admin:content_visit_changelist' %}">Ҳар бир ташрифни алоҳида кўриш →</a></p>
+{% endif %}
+</div>
+{% endblock %}
