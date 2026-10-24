@@ -1,0 +1,7 @@
+backend/venv/
+backend/db.sqlite3
+backend/secret_key
+backend/media/
+backend/static/
+__pycache__/
+*.pyc
