@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import cache_control
 
 from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
+from . import notify
 from .notify import sync_later
 
 
@@ -125,4 +126,18 @@ def track(request):
         if v.events.count() < 200:
             Event.objects.create(visit=v, name=d['name'], label=str(d.get('label') or '')[:200])
         v.save(update_fields=['last_seen'])
+    return JsonResponse({'ok': True})
+
+
+@csrf_exempt
+@require_POST
+def tg_webhook(request):
+    """Telegram бот webhook'и: /start — обуна, /stop — обунадан чиқиш."""
+    s = SiteSettings.get()
+    if not s.tg_token or request.headers.get('X-Telegram-Bot-Api-Secret-Token') != notify.webhook_secret(s):
+        return JsonResponse({'ok': False}, status=403)
+    try:
+        notify.handle_update(s, json.loads(request.body or b'{}'))
+    except Exception:  # noqa: BLE001 — Telegram 200 олмаса, бир хил update'ни қайта-қайта юбораверади
+        notify.log.exception('Telegram webhook')
     return JsonResponse({'ok': True})

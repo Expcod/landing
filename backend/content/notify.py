@@ -3,6 +3,7 @@
 Созламалар admin → «Созламалар»да. Юбориш фон оқимида бўлади, шунинг учун
 сайтдаги форма Telegram ёки Odoo секин ишласа ҳам кутиб қолмайди.
 """
+import hashlib
 import json
 import logging
 import threading
@@ -10,10 +11,11 @@ import urllib.error
 import urllib.request
 from html import escape
 
+from django.conf import settings
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
-from .models import Lead, SiteSettings, Visit
+from .models import Lead, SiteSettings, TgSubscriber, Visit
 
 log = logging.getLogger(__name__)
 UA = {'User-Agent': 'novacode-landing/1.0'}  # Cloudflare Python'нинг стандарт UA'сини 403 билан қайтаради
@@ -35,9 +37,64 @@ def _source(lead):
 
 
 # ---------- Telegram ----------
+# Бот webhook орқали ишлайди: /start босган одам (ёки бот қўшилган гуруҳ) TgSubscriber'га
+# ёзилади ва янги аризалар ҳаммасига юборилади. Webhook admin'да токен сақланганда уланади.
 
-def chat_ids(s):
-    return [c.strip() for c in s.tg_chat_ids.replace(';', ',').split(',') if c.strip()]
+WELCOME = ('Ассалому алайкум, {name}! 👋\n\n'
+           'Сиз <b>novacode.uz</b> сайтидан келадиган аризалар рўйхатига қўшилдингиз. '
+           'Янги ариза тушиши билан шу ерга хабар келади.\n\nТўхтатиш учун: /stop')
+GROUP_WELCOME = 'Ассалому алайкум! 👋 Энди <b>novacode.uz</b> сайтидан келадиган аризалар шу гуруҳга юборилади.'
+BYE = 'Аризалар юбориш тўхтатилди. Қайта улаш учун: /start'
+
+
+def tg(s, method, **data):
+    return _post(f'https://api.telegram.org/bot{s.tg_token}/{method}', data)
+
+
+def webhook_secret(s):
+    return hashlib.sha256(f'{settings.SECRET_KEY}:{s.tg_token}'.encode()).hexdigest()[:48]
+
+
+def set_webhook(s, url):
+    return tg(s, 'setWebhook', url=url, secret_token=webhook_secret(s),
+              allowed_updates=['message', 'my_chat_member'], drop_pending_updates=True)
+
+
+def _chat_name(c):
+    return (c.get('title') or ' '.join(filter(None, [c.get('first_name'), c.get('last_name')]))
+            or c.get('username') or str(c['id']))[:200]
+
+
+def _subscribe(s, chat, greet):
+    sub, _ = TgSubscriber.objects.update_or_create(chat_id=chat['id'], defaults=dict(
+        name=_chat_name(chat), username=(chat.get('username') or '')[:100],
+        is_group=chat.get('type') != 'private', active=True))
+    tg(s, 'sendMessage', chat_id=chat['id'], parse_mode='HTML', text=greet)
+    return sub
+
+
+def handle_update(s, u):
+    """Telegram'дан келган битта update."""
+    m = u.get('message')
+    if m and m.get('chat'):
+        chat, text = m['chat'], (m.get('text') or '').strip().lower()
+        cmd = text.split()[0].split('@')[0] if text else ''
+        if cmd == '/start':
+            if chat.get('type') == 'private':
+                _subscribe(s, chat, WELCOME.format(name=escape(m.get('from', {}).get('first_name') or '')))
+            else:
+                _subscribe(s, chat, GROUP_WELCOME)
+        elif cmd == '/stop':
+            TgSubscriber.objects.filter(chat_id=chat['id']).update(active=False)
+            tg(s, 'sendMessage', chat_id=chat['id'], text=BYE)
+        return
+    cm = u.get('my_chat_member')
+    if cm and cm.get('chat'):
+        chat, status = cm['chat'], (cm.get('new_chat_member') or {}).get('status')
+        if status in ('left', 'kicked'):  # ботни блоклади ёки гуруҳдан чиқарди
+            TgSubscriber.objects.filter(chat_id=chat['id']).update(active=False)
+        elif status in ('member', 'administrator') and chat.get('type') != 'private':
+            _subscribe(s, chat, GROUP_WELCOME)
 
 
 def send_telegram(lead, s):
@@ -58,23 +115,18 @@ def send_telegram(lead, s):
     if lead.odoo_id and s.odoo_url:
         rows.append(f'<a href="{odoo_link(lead, s)}">Odoo CRM\'да очиш</a>')
     text = '\n'.join(rows)
-    for chat in chat_ids(s):
-        _post(f'https://api.telegram.org/bot{s.tg_token}/sendMessage',
-              {'chat_id': chat, 'text': text, 'parse_mode': 'HTML', 'disable_web_page_preview': True})
-
-
-def bot_chats(token):
-    """Ботга ёзган / уни қўшган чатлар — admin'да чат ID топиш учун."""
-    req = urllib.request.Request(f'https://api.telegram.org/bot{token}/getUpdates', headers=UA)
-    with urllib.request.urlopen(req, timeout=10) as r:
-        data = json.load(r)
-    chats = {}
-    for u in data.get('result', []):
-        for k in ('message', 'channel_post', 'my_chat_member', 'edited_message'):
-            c = (u.get(k) or {}).get('chat')
-            if c:
-                chats[c['id']] = c.get('title') or ' '.join(filter(None, [c.get('first_name'), c.get('last_name')])) or c.get('username', '')
-    return chats
+    errors = []
+    for sub in TgSubscriber.objects.filter(active=True):
+        try:
+            tg(s, 'sendMessage', chat_id=sub.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+        except RuntimeError as e:
+            if str(e).startswith('403'):  # ботни блоклаган ёки гуруҳдан чиқарилган
+                sub.active = False
+                sub.save(update_fields=['active'])
+            else:
+                errors.append(f'{sub}: {e}')
+    if errors:
+        raise RuntimeError('; '.join(errors))
 
 
 # ---------- Odoo CRM: Meta Ads модули (instagram_ads) ----------
@@ -118,7 +170,7 @@ def sync(lead):
         except Exception as e:  # noqa: BLE001 — хато аризани йўқотмаслиги керак
             log.exception('Odoo CRM: lead %s', lead.pk)
             errors.append(f'Odoo: {e}')
-    if s.tg_token and chat_ids(s) and not lead.tg_sent:
+    if s.tg_token and TgSubscriber.objects.filter(active=True).exists() and not lead.tg_sent:
         try:
             send_telegram(lead, s)
             lead.tg_sent = True

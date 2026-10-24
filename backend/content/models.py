@@ -106,8 +106,6 @@ class SiteSettings(models.Model):
                                 help_text='Фақат рақамлар, масалан: 1234567890123456. Бўш қолса, Pixel уланмайди.',
                                 validators=[RegexValidator(r'^\d*$', 'Pixel ID фақат рақамлардан иборат бўлади.')])
     tg_token = models.CharField('Telegram бот токени', max_length=100, blank=True)
-    tg_chat_ids = models.CharField('Telegram чат ID лари', max_length=300, blank=True,
-                                   help_text='Вергул билан. Ботга /start ёзинг ёки уни гуруҳга қўшинг — ID пастда чиқади.')
     odoo_url = models.URLField('Odoo манзили', blank=True, help_text='масалан: https://demo.novaodoo.uz')
     odoo_db = models.CharField('Odoo базаси', max_length=100, blank=True)
     odoo_api_key = models.CharField('Odoo API калити', max_length=100, blank=True)
@@ -122,6 +120,24 @@ class SiteSettings(models.Model):
     @classmethod
     def get(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class TgSubscriber(models.Model):
+    """Ботга /start босган одам ёки бот қўшилган гуруҳ — янги аризалар шуларга юборилади."""
+    chat_id = models.BigIntegerField('Чат ID', unique=True)
+    name = models.CharField('Исм / гуруҳ', max_length=200, blank=True)
+    username = models.CharField('Username', max_length=100, blank=True)
+    is_group = models.BooleanField('Гуруҳ', default=False)
+    active = models.BooleanField('Аризалар юборилсин', default=True)
+    created = models.DateTimeField('Қўшилган', auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created']
+        verbose_name = 'Telegram обуначи'
+        verbose_name_plural = 'Telegram обуначилар'
+
+    def __str__(self):
+        return self.name or str(self.chat_id)
 
 
 class Visit(models.Model):

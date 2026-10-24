@@ -18,7 +18,8 @@ venv/bin/python manage.py migrate && venv/bin/python manage.py collectstatic --n
 - Odoo'даги **Meta Ads** модулига (`instagram_ads`) лид бўлиб тушади: `POST /instagram_ads/api/lead`, «Yangi» босқичи, манба = «Tashqi API».
 
 Созлаш: admin → **Созламалар**:
-- *Telegram бот токени* ва *чат ID лари* (вергул билан). Ботга `/start` ёзинг ёки уни гуруҳга қўшинг — ID шу саҳифада «Ботга ёзган чатлар»да чиқади.
+- *Telegram бот токени* — «Сақлаш» босилганда бот webhook'и (`/api/tg/webhook/`) ўзи уланади.
+  Ботга `/start` босган ҳар бир одам (ёки бот қўшилган гуруҳ) салом хабарини олади ва admin → **Telegram обуначилар**га қўшилади; аризалар шуларнинг ҳаммасига боради. `/stop` — обунадан чиқиш, admin'да «Аризалар юборилсин» белгисини олиб ҳам ўчириш мумкин.
 - *Odoo манзили* (`https://demo.novaodoo.uz`), *базаси* (`crm`), *API калити* — Odoo → Meta Ads → Sozlash → «Lead API kaliti».
 
 Токен ва калитлар фақат базада сақланади, git'га тушмайди. Юборилмай қолган аризалар: admin → Аризалар → белгилаб, «Telegram ва Odoo CRM'га қайта юбориш».

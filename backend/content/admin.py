@@ -1,9 +1,9 @@
 from django.contrib import admin, messages
-from django.utils.html import format_html, format_html_join
+from django.utils.html import format_html
 
 from . import notify
 
-from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
+from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, TgSubscriber, Visit
 
 admin.site.site_header = 'Nova Code — landing'
 admin.site.site_title = 'Nova Code landing'
@@ -82,30 +82,55 @@ class LeadAdmin(admin.ModelAdmin):
 
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(admin.ModelAdmin):
-    readonly_fields = ['bot_chats']
+    readonly_fields = ['webhook_status']
     fieldsets = [
         (None, {'fields': ['pixel_id']}),
-        ('Аризалар → Telegram бот', {'fields': ['tg_token', 'tg_chat_ids', 'bot_chats']}),
+        ('Аризалар → Telegram бот', {'fields': ['tg_token', 'webhook_status'],
+                                     'description': 'Ботга /start босган ҳар бир одамга (ва бот қўшилган гуруҳга) аризалар '
+                                                    'юборилади. Рўйхат: «Telegram обуначилар».'}),
         ('Аризалар → Odoo CRM (Meta Ads модули)', {'fields': ['odoo_url', 'odoo_db', 'odoo_api_key'],
-                                 'description': 'API калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».'}),
+                                                    'description': 'API калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».'}),
     ]
 
-    @admin.display(description='Ботга ёзган чатлар')
-    def bot_chats(self, o):
+    @admin.display(description='Бот ҳолати')
+    def webhook_status(self, o):
         if not o.tg_token:
             return '—'
         try:
-            chats = notify.bot_chats(o.tg_token)
+            info = notify.tg(o, 'getWebhookInfo')['result']
         except Exception as e:  # noqa: BLE001
             return f'Текшириб бўлмади: {e}'
-        if not chats:
-            return 'Ҳали ҳеч ким ёзмаган: ботга /start ёзинг ёки уни гуруҳга қўшиб, гуруҳда бирор хабар ёзинг.'
-        return format_html_join(format_html('<br>'), '<code>{}</code> — {}', chats.items())
+        if not info.get('url'):
+            return 'Уланмаган — «Сақлаш» босинг.'
+        err = info.get('last_error_message')
+        return f"Уланган: {info['url']}" + (f' (охирги хато: {err})' if err else '')
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.tg_token:
+            url = f'https://{request.get_host()}/api/tg/webhook/'
+            try:
+                notify.set_webhook(obj, url)
+                self.message_user(request, f'Telegram бот уланди: {url}')
+            except Exception as e:  # noqa: BLE001
+                self.message_user(request, f'Telegram ботни улаб бўлмади: {e}', messages.ERROR)
 
     def has_add_permission(self, request):
         return not SiteSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(TgSubscriber)
+class TgSubscriberAdmin(admin.ModelAdmin):
+    list_display = ['name', 'username', 'chat_id', 'is_group', 'active', 'created']
+    list_editable = ['active']
+    list_filter = ['active', 'is_group']
+    search_fields = ['name', 'username']
+    readonly_fields = ['chat_id', 'name', 'username', 'is_group', 'created']
+
+    def has_add_permission(self, request):
         return False
 
 
