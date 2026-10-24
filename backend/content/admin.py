@@ -86,8 +86,9 @@ class SiteSettingsAdmin(admin.ModelAdmin):
     fieldsets = [
         (None, {'fields': ['pixel_id']}),
         ('Аризалар → Telegram бот', {'fields': ['tg_token', 'webhook_status'],
-                                     'description': 'Ботга /start босган ҳар бир одамга (ва бот қўшилган гуруҳга) аризалар '
-                                                    'юборилади. Рўйхат: «Telegram обуначилар».'}),
+                                     'description': 'Раҳбар ботга /start босади, кейин «Telegram обуначилар»да унга «Админ» '
+                                                    'белгиси қўйилади. Бошқалар /start босганда админга «Рухсат бериш / Йўқ» '
+                                                    'сўрови боради; аризалар фақат рухсат берилганларга юборилади.'}),
         ('Аризалар → Odoo CRM (Meta Ads модули)', {'fields': ['odoo_url', 'odoo_db', 'odoo_api_key'],
                                                     'description': 'API калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».'}),
     ]
@@ -124,14 +125,19 @@ class SiteSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(TgSubscriber)
 class TgSubscriberAdmin(admin.ModelAdmin):
-    list_display = ['name', 'username', 'chat_id', 'is_group', 'active', 'created']
-    list_editable = ['active']
-    list_filter = ['active', 'is_group']
+    list_display = ['name', 'username', 'is_group', 'is_admin', 'status', 'active', 'created']
+    list_editable = ['is_admin', 'status', 'active']
+    list_filter = ['status', 'is_admin', 'active', 'is_group']
     search_fields = ['name', 'username']
     readonly_fields = ['chat_id', 'name', 'username', 'is_group', 'created']
 
     def has_add_permission(self, request):
         return False
+
+    def save_model(self, request, obj, form, change):
+        if obj.is_admin:  # админга доим аризалар боради
+            obj.status = TgSubscriber.APPROVED
+        super().save_model(request, obj, form, change)
 
 
 class EventInline(admin.TabularInline):

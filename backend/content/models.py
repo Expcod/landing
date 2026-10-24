@@ -123,12 +123,22 @@ class SiteSettings(models.Model):
 
 
 class TgSubscriber(models.Model):
-    """Ботга /start босган одам ёки бот қўшилган гуруҳ — янги аризалар шуларга юборилади."""
+    """Ботга /start босган одам ёки бот қўшилган гуруҳ.
+
+    Аризалар фақат админ рухсат берганларга (status=approved) ва /stop босмаганларга (active) боради.
+    Админ (раҳбар) янги обуначига ботнинг ўзида «Рухсат бериш / Йўқ» тугмаси билан жавоб беради.
+    """
+    PENDING, APPROVED, REJECTED = 'pending', 'approved', 'rejected'
+    STATUSES = [(PENDING, 'Рухсат кутилмоқда'), (APPROVED, 'Рухсат берилган'), (REJECTED, 'Рад этилган')]
+
     chat_id = models.BigIntegerField('Чат ID', unique=True)
     name = models.CharField('Исм / гуруҳ', max_length=200, blank=True)
     username = models.CharField('Username', max_length=100, blank=True)
     is_group = models.BooleanField('Гуруҳ', default=False)
-    active = models.BooleanField('Аризалар юборилсин', default=True)
+    is_admin = models.BooleanField('Админ (рухсат беради)', default=False,
+                                   help_text='Янги обуначилар учун рухсат сўрови шу одамларга боради.')
+    status = models.CharField('Рухсат', max_length=10, choices=STATUSES, default=PENDING)
+    active = models.BooleanField('Обуна ёқиқ', default=True, help_text='/stop босса ёки ботни блокласа ўчади.')
     created = models.DateTimeField('Қўшилган', auto_now_add=True)
 
     class Meta:

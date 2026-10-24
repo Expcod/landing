@@ -37,13 +37,20 @@ def _source(lead):
 
 
 # ---------- Telegram ----------
-# Бот webhook орқали ишлайди: /start босган одам (ёки бот қўшилган гуруҳ) TgSubscriber'га
-# ёзилади ва янги аризалар ҳаммасига юборилади. Webhook admin'да токен сақланганда уланади.
+# Бот webhook орқали ишлайди (admin'да токен сақланганда уланади).
+# /start босган одам (ёки бот қўшилган гуруҳ) TgSubscriber'га «рухсат кутилмоқда» бўлиб ёзилади,
+# админларга «✅ Рухсат бериш / ❌ Йўқ» тугмали сўров боради. «Йўқ» — «Ростдан ҳам?» деб қайта
+# сўралади. Аризалар фақат рухсат берилганларга юборилади.
 
-WELCOME = ('Ассалому алайкум, {name}! 👋\n\n'
-           'Сиз <b>novacode.uz</b> сайтидан келадиган аризалар рўйхатига қўшилдингиз. '
-           'Янги ариза тушиши билан шу ерга хабар келади.\n\nТўхтатиш учун: /stop')
-GROUP_WELCOME = 'Ассалому алайкум! 👋 Энди <b>novacode.uz</b> сайтидан келадиган аризалар шу гуруҳга юборилади.'
+WAIT = ('Ассалому алайкум, {name}! 👋\n\n'
+        'Бу бот <b>novacode.uz</b> сайтидан келадиган аризаларни юборади. '
+        'Сўровингиз раҳбарга юборилди — рухсат берилгач, янги аризалар шу ерга кела бошлайди.')
+APPROVED_MSG = ('✅ Раҳбар рухсат берди. Энди <b>novacode.uz</b> сайтидан келадиган янги аризалар шу ерга келади.\n\n'
+                'Тўхтатиш учун: /stop')
+REJECTED_MSG = '❌ Раҳбар аризаларни олишга рухсат бермади.'
+ALREADY = 'Сиз аризалар рўйхатидасиз ✅ Янги ариза тушиши билан шу ерга хабар келади.\n\nТўхтатиш учун: /stop'
+ADMIN_WELCOME = ('Ассалому алайкум, {name}! 👋 Сиз ботнинг админисиз: янги аризалар ва '
+                 'янги фойдаланувчиларнинг рухсат сўровлари шу ерга келади.\n\nТўхтатиш учун: /stop')
 BYE = 'Аризалар юбориш тўхтатилди. Қайта улаш учун: /start'
 
 
@@ -57,7 +64,7 @@ def webhook_secret(s):
 
 def set_webhook(s, url):
     return tg(s, 'setWebhook', url=url, secret_token=webhook_secret(s),
-              allowed_updates=['message', 'my_chat_member'], drop_pending_updates=True)
+              allowed_updates=['message', 'my_chat_member', 'callback_query'], drop_pending_updates=True)
 
 
 def _chat_name(c):
@@ -65,28 +72,99 @@ def _chat_name(c):
             or c.get('username') or str(c['id']))[:200]
 
 
-def _subscribe(s, chat, greet):
-    sub, _ = TgSubscriber.objects.update_or_create(chat_id=chat['id'], defaults=dict(
-        name=_chat_name(chat), username=(chat.get('username') or '')[:100],
-        is_group=chat.get('type') != 'private', active=True))
-    tg(s, 'sendMessage', chat_id=chat['id'], parse_mode='HTML', text=greet)
-    return sub
+def _say(s, chat_id, text, **kw):
+    try:
+        tg(s, 'sendMessage', chat_id=chat_id, text=text, parse_mode='HTML', **kw)
+    except RuntimeError:
+        log.warning('Telegram: %s га юбориб бўлмади', chat_id, exc_info=True)
+
+
+def _who(sub):
+    kind = '👥 Гуруҳ' if sub.is_group else '👤'
+    uname = f' (@{escape(sub.username)})' if sub.username else ''
+    return f'{kind} <b>{escape(sub.name)}</b>{uname}'
+
+
+def _ask_kb(cid):
+    return {'inline_keyboard': [[{'text': '✅ Рухсат бериш', 'callback_data': f'ok:{cid}'},
+                                 {'text': '❌ Йўқ', 'callback_data': f'no:{cid}'}]]}
+
+
+def _confirm_kb(cid):
+    return {'inline_keyboard': [[{'text': 'Ҳа, рад этиш', 'callback_data': f'rej:{cid}'},
+                                 {'text': '↩️ Ортга', 'callback_data': f'back:{cid}'}]]}
+
+
+def _ask_text(sub):
+    return f'🔔 <b>Янги фойдаланувчи</b>\n\n{_who(sub)}\n\nаризаларни олмоқчи. Рухсат берасизми?'
+
+
+def _ask_admins(s, sub):
+    admins = TgSubscriber.objects.filter(is_admin=True, active=True).exclude(chat_id=sub.chat_id)
+    if not admins:
+        log.warning('Telegram: админ йўқ, %s рухсат кутмоқда (admin → Telegram обуначилар)', sub)
+    for a in admins:
+        _say(s, a.chat_id, _ask_text(sub), reply_markup=_ask_kb(sub.chat_id))
+
+
+def _register(s, chat, first_name=''):
+    """/start ёки ботни гуруҳга қўшиш."""
+    sub, created = TgSubscriber.objects.get_or_create(chat_id=chat['id'])
+    sub.name, sub.username = _chat_name(chat), (chat.get('username') or '')[:100]
+    sub.is_group, sub.active = chat.get('type') != 'private', True
+    name = escape(first_name or sub.name)
+    if sub.is_admin:
+        sub.status = sub.APPROVED
+        sub.save()
+        return _say(s, sub.chat_id, ADMIN_WELCOME.format(name=name))
+    if sub.status == sub.APPROVED:
+        sub.save()
+        return _say(s, sub.chat_id, ALREADY)
+    sub.status = sub.PENDING  # янги ёки илгари рад этилган — сўров қайта юборилади
+    sub.save()
+    _say(s, sub.chat_id, WAIT.format(name=name))
+    _ask_admins(s, sub)
+
+
+def _handle_callback(s, q):
+    msg, frm = q.get('message') or {}, q.get('from') or {}
+    action, _, cid = (q.get('data') or '').partition(':')
+    admin = TgSubscriber.objects.filter(chat_id=frm.get('id'), is_admin=True).first()
+    sub = TgSubscriber.objects.filter(chat_id=int(cid)).first() if cid.lstrip('-').isdigit() else None
+    if not admin or not sub:
+        return tg(s, 'answerCallbackQuery', callback_query_id=q['id'], text='Бу амал учун рухсатингиз йўқ.', show_alert=True)
+    edit = dict(chat_id=msg['chat']['id'], message_id=msg['message_id'], parse_mode='HTML')
+    by = escape(admin.name)
+    if action == 'no':
+        tg(s, 'editMessageText', **edit, reply_markup=_confirm_kb(sub.chat_id),
+           text=f'⚠️ <b>Аминмисиз?</b>\n\n{_who(sub)}\n\nрад этилса, унга аризалар бормайди.')
+    elif action == 'back':
+        tg(s, 'editMessageText', **edit, text=_ask_text(sub), reply_markup=_ask_kb(sub.chat_id))
+    elif action in ('ok', 'rej'):
+        new = sub.APPROVED if action == 'ok' else sub.REJECTED
+        changed = sub.status != new
+        sub.status = new
+        sub.save(update_fields=['status'])
+        mark = f'✅ Рухсат берилди ({by})' if action == 'ok' else f'❌ Рад этилди ({by})'
+        tg(s, 'editMessageText', **edit, text=f'{_who(sub)}\n\n{mark}')
+        if changed:
+            _say(s, sub.chat_id, APPROVED_MSG if action == 'ok' else REJECTED_MSG)
+    tg(s, 'answerCallbackQuery', callback_query_id=q['id'])
 
 
 def handle_update(s, u):
     """Telegram'дан келган битта update."""
+    if u.get('callback_query'):
+        return _handle_callback(s, u['callback_query'])
     m = u.get('message')
     if m and m.get('chat'):
         chat, text = m['chat'], (m.get('text') or '').strip().lower()
         cmd = text.split()[0].split('@')[0] if text else ''
         if cmd == '/start':
-            if chat.get('type') == 'private':
-                _subscribe(s, chat, WELCOME.format(name=escape(m.get('from', {}).get('first_name') or '')))
-            else:
-                _subscribe(s, chat, GROUP_WELCOME)
+            _register(s, chat, (m.get('from') or {}).get('first_name', '') if chat.get('type') == 'private' else '')
         elif cmd == '/stop':
             TgSubscriber.objects.filter(chat_id=chat['id']).update(active=False)
-            tg(s, 'sendMessage', chat_id=chat['id'], text=BYE)
+            _say(s, chat['id'], BYE)
         return
     cm = u.get('my_chat_member')
     if cm and cm.get('chat'):
@@ -94,7 +172,7 @@ def handle_update(s, u):
         if status in ('left', 'kicked'):  # ботни блоклади ёки гуруҳдан чиқарди
             TgSubscriber.objects.filter(chat_id=chat['id']).update(active=False)
         elif status in ('member', 'administrator') and chat.get('type') != 'private':
-            _subscribe(s, chat, GROUP_WELCOME)
+            _register(s, chat)
 
 
 def send_telegram(lead, s):
@@ -116,7 +194,7 @@ def send_telegram(lead, s):
         rows.append(f'<a href="{odoo_link(lead, s)}">Odoo CRM\'да очиш</a>')
     text = '\n'.join(rows)
     errors = []
-    for sub in TgSubscriber.objects.filter(active=True):
+    for sub in TgSubscriber.objects.filter(active=True, status=TgSubscriber.APPROVED):
         try:
             tg(s, 'sendMessage', chat_id=sub.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
         except RuntimeError as e:
@@ -170,7 +248,7 @@ def sync(lead):
         except Exception as e:  # noqa: BLE001 — хато аризани йўқотмаслиги керак
             log.exception('Odoo CRM: lead %s', lead.pk)
             errors.append(f'Odoo: {e}')
-    if s.tg_token and TgSubscriber.objects.filter(active=True).exists() and not lead.tg_sent:
+    if s.tg_token and TgSubscriber.objects.filter(active=True, status=TgSubscriber.APPROVED).exists() and not lead.tg_sent:
         try:
             send_telegram(lead, s)
             lead.tg_sent = True
