@@ -72,6 +72,9 @@
   }
 
   // Видео карусель: ўртадаги видео тиниқ ва ўзи (овозсиз) ўйнайди, ён томонлари хира
+  var goal = function (n, p) { if (window.ncGoal) window.ncGoal(n, p); };
+  var once = {};
+  var goalOnce = function (n, p) { var k = n + (p && p.video || ''); if (once[k]) return; once[k] = 1; goal(n, p); };
   var R = { list: [], cur: 0, muted: true };
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var playIcon = '<span class="pbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="#171923" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></span>';
@@ -130,6 +133,7 @@
     var i = +card.getAttribute('data-i');
     if (e.target.closest('.mute')) {
       R.muted = !R.muted;
+      if (!R.muted) goalOnce('video_unmute', { video: R.list[i] && R.list[i].cap });
       var v = card.querySelector('video'); v.muted = R.muted;
       e.target.closest('.mute').innerHTML = muteIcon(R.muted);
       if (v.paused) v.play().catch(function () {});
@@ -139,6 +143,34 @@
     var vv = card.querySelector('video');
     if (vv.paused) vv.play().catch(function () {}); else vv.pause();
   });
+
+  // Аналитика: видео бошланди / ярмигача / охиригача кўрилди (ҳар бир видео учун бир марта)
+  var vname = function (v) { var c = v.closest('.reel'); var r = c && R.list[+c.getAttribute('data-i')]; return r ? r.cap : ''; };
+  $('reelsTrack').addEventListener('play', function (e) {
+    if (e.target.closest('.reel.on')) goalOnce('video_start', { video: vname(e.target) });
+  }, true);
+  $('reelsTrack').addEventListener('timeupdate', function (e) {
+    var v = e.target; if (!v.duration || !v.closest('.reel.on')) return;
+    if (v.currentTime / v.duration >= 0.5) goalOnce('video_50', { video: vname(v) });
+  }, true);
+  $('reelsTrack').addEventListener('ended', function (e) { goalOnce('video_complete', { video: vname(e.target) }); }, true);
+  document.querySelectorAll('#reels .rbtn').forEach(function (b) { b.addEventListener('click', function () { goalOnce('video_swipe'); }); });
+
+  // Аналитика: форма бўлимига етди, тўлдира бошлади, алоқа тугмалари
+  if ('IntersectionObserver' in window && $('audit')) {
+    var fo = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { goalOnce('form_view'); fo.disconnect(); } }, { threshold: 0.3 });
+    fo.observe($('audit'));
+  }
+  var lf = $('leadForm');
+  if (lf) lf.addEventListener('focusin', function () { goalOnce('form_start'); });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]'); if (!a) return;
+    var h = a.getAttribute('href');
+    if (/^tel:/.test(h)) goal('click_phone');
+    else if (/t\.me\//.test(h)) goal('click_telegram');
+    else if (/instagram\.com/.test(h)) goal('click_instagram');
+    else if (h === '#audit') goal('click_cta');
+  }, true);
 
   // Видео тугаса — кейингисига ўтади
   $('reelsTrack').addEventListener('ended', function (e) {
