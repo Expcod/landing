@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.cache import cache_control
 
 from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
+from .notify import sync_later
 
 
 def url(f):
@@ -52,11 +53,13 @@ def lead(request):
     # Спамдан ҳимоя: битта IP'дан соатига 10 тадан ортиқ ариза қабул қилинмайди
     if ip and Lead.objects.filter(ip=ip, created__gte=timezone.now() - timedelta(hours=1)).count() >= 10:
         return JsonResponse({'ok': False}, status=429)
-    Lead.objects.create(
+    sid = str(d.get('sid', ''))[:40]
+    obj = Lead.objects.create(
         name=name, phone=phone, ip=ip,
         business=str(d.get('business', ''))[:200], problem=str(d.get('problem', ''))[:5000],
-        page=str(d.get('page', ''))[:500],
+        page=str(d.get('page', ''))[:500], sid=sid if re.fullmatch(r'[\w-]{8,40}', sid) else '',
     )
+    sync_later(obj)  # Telegram бот ва Odoo CRM'га — фонда
     return JsonResponse({'ok': True})
 
 

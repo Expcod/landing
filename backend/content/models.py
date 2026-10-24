@@ -87,6 +87,10 @@ class Lead(models.Model):
     ip = models.GenericIPAddressField('IP', null=True, blank=True)
     status = models.CharField('Ҳолати', max_length=20, choices=STATUSES, default='new')
     note = models.TextField('Изоҳ (менеджер учун)', blank=True)
+    sid = models.CharField('Ташриф', max_length=40, blank=True)
+    odoo_id = models.PositiveIntegerField('Odoo CRM ID', null=True, blank=True)
+    tg_sent = models.BooleanField("Telegram'га юборилди", default=False)
+    sync_error = models.TextField('Юбориш хатоси', blank=True)
 
     class Meta:
         ordering = ['-created']
@@ -101,6 +105,12 @@ class SiteSettings(models.Model):
     pixel_id = models.CharField('Meta Pixel ID', max_length=30, blank=True,
                                 help_text='Фақат рақамлар, масалан: 1234567890123456. Бўш қолса, Pixel уланмайди.',
                                 validators=[RegexValidator(r'^\d*$', 'Pixel ID фақат рақамлардан иборат бўлади.')])
+    tg_token = models.CharField('Telegram бот токени', max_length=100, blank=True)
+    tg_chat_ids = models.CharField('Telegram чат ID лари', max_length=300, blank=True,
+                                   help_text='Вергул билан. Ботга /start ёзинг ёки уни гуруҳга қўшинг — ID пастда чиқади.')
+    odoo_url = models.URLField('Odoo манзили', blank=True, help_text='масалан: https://demo.novaodoo.uz')
+    odoo_db = models.CharField('Odoo базаси', max_length=100, blank=True)
+    odoo_api_key = models.CharField('Odoo API калити', max_length=100, blank=True)
 
     class Meta:
         verbose_name = 'Созламалар'

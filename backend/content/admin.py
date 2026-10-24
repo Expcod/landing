@@ -1,5 +1,7 @@
-from django.contrib import admin
-from django.utils.html import format_html
+from django.contrib import admin, messages
+from django.utils.html import format_html, format_html_join
+
+from . import notify
 
 from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
 
@@ -52,12 +54,27 @@ class ReelAdmin(admin.ModelAdmin):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ['created', 'name', 'phone', 'business', 'status']
+    list_display = ['created', 'name', 'phone', 'business', 'status', 'crm', 'tg_sent']
     list_editable = ['status']
-    list_filter = ['status', 'created']
+    list_filter = ['status', 'tg_sent', 'created']
     search_fields = ['name', 'phone', 'business', 'problem']
-    readonly_fields = ['created', 'name', 'phone', 'business', 'problem', 'page', 'ip']
+    readonly_fields = ['created', 'name', 'phone', 'business', 'problem', 'page', 'ip', 'crm', 'tg_sent', 'sync_error']
     fields = readonly_fields + ['status', 'note']
+    actions = ['resend']
+
+    @admin.display(description='Odoo CRM')
+    def crm(self, o):
+        if o.odoo_id:
+            return format_html('<a href="{}" target="_blank">#{}</a>', notify.odoo_link(o, SiteSettings.get()), o.odoo_id)
+        if o.odoo_id == 0:
+            return 'юборилди'
+        return format_html('<span style="color:#c00" title="{}">юборилмаган</span>', o.sync_error) if o.sync_error else '—'
+
+    @admin.action(description="Telegram ва Odoo CRM'га қайта юбориш (юборилмаганларини)")
+    def resend(self, request, qs):
+        ok = sum(notify.sync(o) for o in qs)
+        level = messages.SUCCESS if ok == len(qs) else messages.WARNING
+        self.message_user(request, f'{ok} та ариза юборилди, {len(qs) - ok} тасида хато (аризани очиб кўринг).', level)
 
     def has_add_permission(self, request):
         return False
@@ -65,6 +82,26 @@ class LeadAdmin(admin.ModelAdmin):
 
 @admin.register(SiteSettings)
 class SiteSettingsAdmin(admin.ModelAdmin):
+    readonly_fields = ['bot_chats']
+    fieldsets = [
+        (None, {'fields': ['pixel_id']}),
+        ('Аризалар → Telegram бот', {'fields': ['tg_token', 'tg_chat_ids', 'bot_chats']}),
+        ('Аризалар → Odoo CRM (Meta Ads модули)', {'fields': ['odoo_url', 'odoo_db', 'odoo_api_key'],
+                                 'description': 'API калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».'}),
+    ]
+
+    @admin.display(description='Ботга ёзган чатлар')
+    def bot_chats(self, o):
+        if not o.tg_token:
+            return '—'
+        try:
+            chats = notify.bot_chats(o.tg_token)
+        except Exception as e:  # noqa: BLE001
+            return f'Текшириб бўлмади: {e}'
+        if not chats:
+            return 'Ҳали ҳеч ким ёзмаган: ботга /start ёзинг ёки уни гуруҳга қўшиб, гуруҳда бирор хабар ёзинг.'
+        return format_html_join(format_html('<br>'), '<code>{}</code> — {}', chats.items())
+
     def has_add_permission(self, request):
         return not SiteSettings.objects.exists()
 

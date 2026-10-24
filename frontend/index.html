@@ -977,6 +977,7 @@ var INSTAGRAM_URL = 'https://www.instagram.com/komron_ayti/';
     if (msg) { err.textContent = msg; show(err, true); return; }
     show(err, false);
     var lead = { name: name, phone: phone, business: $('#f-type').value, problem: $('#f-prob').value, page: location.href, time: new Date().toISOString() };
+    try { lead.sid = window.sessionStorage.getItem('nc_sid') || ''; } catch (x) {}
     if (LEAD_ENDPOINT) {
       try { fetch(LEAD_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); } catch (x) {}
     }
