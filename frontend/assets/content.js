@@ -71,41 +71,95 @@
     }).join('');
   }
 
+  // Видео карусель: ўртадаги видео тиниқ ва ўзи (овозсиз) ўйнайди, ён томонлари хира
+  var R = { list: [], cur: 0, muted: true };
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var playIcon = '<span class="pbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="#171923" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></span>';
+  var muteIcon = function (m) {
+    return m
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="m23 9-6 6M17 9l6 6"></path></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"></path></svg>';
+  };
+
   function reels(list) {
-    var track = $('reelsTrack');
+    R.list = list; R.cur = 0;
     $('reels').style.display = list.length ? '' : 'none';
-    track.innerHTML = list.map(function (r) {
-      return '<div class="reel"><video src="' + esc(r.src) + '" poster="' + esc(r.poster) + '" controls playsinline preload="none"></video>' +
-        (r.url ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.cap) + '</a>' : '<span style="font-size: 14px; font-weight: 600">' + esc(r.cap) + '</span>') + '</div>';
+    $('reelsTrack').innerHTML = list.map(function (r, i) {
+      return '<div class="reel" data-i="' + i + '"><video src="' + esc(r.src) + '" poster="' + esc(r.poster) + '" muted playsinline preload="metadata"></video>' +
+        playIcon + '<button type="button" class="mute" aria-label="Овоз">' + muteIcon(true) + '</button><div class="cap">' + esc(r.cap) + '</div></div>';
     }).join('');
+    layout();
+  }
+
+  function layout() {
+    var n = R.list.length, els = document.querySelectorAll('#reelsTrack .reel');
+    Array.prototype.forEach.call(els, function (el, i) {
+      var d = i - R.cur;
+      if (d > n / 2) d -= n; else if (d < -n / 2) d += n;   // айлана бўйича энг яқин томон
+      var a = Math.abs(d), on = d === 0, v = el.querySelector('video');
+      el.classList.toggle('on', on);
+      el.style.transform = 'translateY(-50%) translateX(calc(var(--gap) * ' + d + ')) scale(' + (on ? 1 : a === 1 ? 0.84 : 0.7) + ')';
+      el.style.opacity = a > 2 ? 0 : on ? 1 : a === 1 ? 0.55 : 0.3;
+      el.style.filter = on ? 'none' : 'grayscale(.6) blur(' + (a === 1 ? 1 : 2) + 'px)';
+      el.style.zIndex = 10 - a;
+      el.style.pointerEvents = a > 2 ? 'none' : '';
+      if (on) {
+        v.muted = R.muted; v.preload = 'auto';
+        el.querySelector('.mute').innerHTML = muteIcon(R.muted);
+        if (!reduce) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+      } else {
+        v.pause(); v.muted = true;
+        if (a === 0 || v.currentTime) v.currentTime = 0;
+      }
+    });
+    var c = $('reelCount'), z = function (x) { return (x < 10 ? '0' : '') + x; };
+    if (c) c.textContent = z(R.cur + 1) + ' / ' + z(n);
+  }
+
+  function go(i) {
+    var n = R.list.length; if (!n) return;
+    R.cur = ((i % n) + n) % n; layout();
   }
 
   document.querySelectorAll('#reels .rbtn').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var t = $('reelsTrack'), first = t.querySelector('.reel');
-      if (first) t.scrollBy({ left: (first.offsetWidth + 16) * +b.getAttribute('data-dir'), behavior: 'smooth' });
-    });
+    b.addEventListener('click', function () { go(R.cur + +b.getAttribute('data-dir')); });
   });
 
-  // Бир видео ёқилса, бошқалари тўхтайди
-  $('reelsTrack').addEventListener('play', function (e) {
-    Array.prototype.forEach.call(document.querySelectorAll('#reelsTrack video'), function (v) { if (v !== e.target) v.pause(); });
+  $('reelsTrack').addEventListener('click', function (e) {
+    var card = e.target.closest('.reel'); if (!card) return;
+    var i = +card.getAttribute('data-i');
+    if (e.target.closest('.mute')) {
+      R.muted = !R.muted;
+      var v = card.querySelector('video'); v.muted = R.muted;
+      e.target.closest('.mute').innerHTML = muteIcon(R.muted);
+      if (v.paused) v.play().catch(function () {});
+      return;
+    }
+    if (i !== R.cur) return go(i);
+    var vv = card.querySelector('video');
+    if (vv.paused) vv.play().catch(function () {}); else vv.pause();
+  });
+
+  // Видео тугаса — кейингисига ўтади
+  $('reelsTrack').addEventListener('ended', function (e) {
+    if (e.target.closest('.reel.on')) go(R.cur + 1);
   }, true);
 
-  // Сичқонча видео устига келса — овозсиз ўзи ўйнайди, кетса тўхтайди
-  if (window.matchMedia && matchMedia('(hover: hover)').matches) {
-    $('reelsTrack').addEventListener('mouseenter', function (e) {
-      var v = e.target;
-      if (v.tagName !== 'VIDEO' || !v.paused) return;
-      v.muted = true; v.dataset.hover = '1';
-      var p = v.play(); if (p && p.catch) p.catch(function () {});
-    }, true);
-    $('reelsTrack').addEventListener('mouseleave', function (e) {
-      var v = e.target;
-      if (v.tagName !== 'VIDEO' || !v.dataset.hover) return;
-      delete v.dataset.hover;
-      if (v.muted) v.pause(); // овоз ёқилган бўлса, ўйнашда давом этади
-    }, true);
+  // Телефонда бармоқ билан суриш
+  var sx = null;
+  $('reelsTrack').addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+  $('reelsTrack').addEventListener('touchend', function (e) {
+    if (sx === null) return;
+    var dx = e.changedTouches[0].clientX - sx; sx = null;
+    if (Math.abs(dx) > 40) go(R.cur + (dx < 0 ? 1 : -1));
+  });
+
+  // Бўлим экрандан чиқса, видео тўхтайди; қайтса — давом этади
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(function (es) {
+      var v = document.querySelector('#reelsTrack .reel.on video'); if (!v) return;
+      if (es[0].isIntersecting) { if (!reduce) v.play().catch(function () {}); } else v.pause();
+    }, { threshold: 0.35 }).observe($('reelsTrack'));
   }
 
   reels(DEFAULT_REELS);

@@ -35,16 +35,22 @@ a{color:#6C5CE7}a:hover{color:#5546d6}
 @keyframes blink{50%{opacity:.2}}
 .scan{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#FFD43B,transparent);box-shadow:0 0 18px 4px rgba(255,212,59,.6);animation:scan 1.1s ease-in-out infinite alternate}
 @keyframes scan{from{top:8%}to{top:90%}}
-.reels-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:4px}
-.reels-track::-webkit-scrollbar{display:none}
-.reel{flex:none;scroll-snap-align:start;display:flex;flex-direction:column;gap:10px}
-.reel video{width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:18px;background:#171923;display:block}
-.reel a{font-size:14px;font-weight:600;color:#171923;text-decoration:none;line-height:1.45}
-.reel a:hover{color:#6C5CE7}
+.reels-track{position:relative;height:560px;--w:270px;--gap:205px;touch-action:pan-y}
+.reel{position:absolute;left:50%;top:50%;width:var(--w);aspect-ratio:9/16;margin-left:calc(var(--w) / -2);border-radius:20px;overflow:hidden;background:#171923;cursor:pointer;transition:transform .55s cubic-bezier(.22,.61,.36,1),opacity .55s,filter .55s,box-shadow .55s;box-shadow:0 20px 40px -24px rgba(15,20,32,.5)}
+.reel video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.reel .cap{position:absolute;left:0;right:0;bottom:0;padding:48px 16px 16px;background:linear-gradient(transparent,rgba(10,12,20,.85));color:#fff;font-size:13px;font-weight:700;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.reel .pbtn{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:999px;background:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:opacity .3s}
+.reel.on{cursor:default;box-shadow:0 0 0 3px #8B7CF6,0 30px 60px -24px rgba(76,61,196,.6)}
+.reel.on .pbtn{opacity:0}
+.reel.on .cap{-webkit-line-clamp:2}
+.reel .mute{position:absolute;top:12px;right:12px;width:36px;height:36px;border-radius:999px;border:0;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:none;align-items:center;justify-content:center}
+.reel.on .mute{display:flex}
+.rctl{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:28px;flex-wrap:wrap}
+.rcount{font-size:14px;font-weight:700;letter-spacing:.08em;color:#626779;min-width:64px;text-align:center}
+.rig{font-size:14px;font-weight:700;color:#171923;text-decoration:none;border-bottom:1.5px solid #171923;margin-left:8px}
+.rig:hover{color:#6C5CE7;border-color:#6C5CE7}
 .rbtn{width:44px;height:44px;border-radius:999px;border:1px solid #E8E8EF;background:#fff;font-size:24px;line-height:1;cursor:pointer;color:#171923}
 .rbtn:hover{border-color:#6C5CE7;color:#6C5CE7}
-.reels-track{--step:calc(25% + 4px)}
-.reel{width:calc((100% - 48px) / 4)}
 .ct{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
 .ct:hover{transform:translateY(-2px);border-color:#D6D0FF!important;box-shadow:0 16px 30px -18px rgba(76,61,196,.45)}
 .mcta{display:none}
@@ -85,8 +91,7 @@ details[open] .pl{transform:rotate(45deg)}
 .inp{height:52px;border-radius:10px;border:1px solid #D9DAE3;padding:0 14px;font-size:16px;font-family:Inter,system-ui,sans-serif;color:#171923;background:#ffffff;width:100%}
 .lbl{font-size:14px;font-weight:700;color:#171923}
 @media (max-width:980px){
-.reels-track{--step:calc(46% + 16px)}
-.reel{width:46%}
+.reels-track{height:500px;--w:240px;--gap:150px}
 .dots{display:none}
 .hero-stage{height:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .hero-main{position:static!important;grid-column:1 / -1}
@@ -101,8 +106,7 @@ details[open] .pl{transform:rotate(45deg)}
 .hide-m{display:none}
 }
 @media (max-width:720px){
-.reels-track{--step:calc(72% + 16px)}
-.reel{width:72%}
+.reels-track{height:440px;--w:220px;--gap:118px}
 .mcta{display:flex;position:fixed;left:12px;right:12px;bottom:12px;z-index:50}
 .nav-links{display:none}
 }
@@ -606,14 +610,12 @@ src="https://www.facebook.com/tr?id=1844234016596327&ev=PageView&noscript=1"
 
 <section id="reels" style="padding: 96px 0 0">
 <div class="wrap">
-<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 32px">
-<div style="max-width: 720px; display: flex; flex-direction: column; gap: 14px">
+<div style="max-width: 720px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px">
 <h2 class="h2">Мижозларимиз ва заводлардан видеолар</h2>
 <p class="lead">Раҳбарлар ўз сўзи билан айтади: нима ўзгарди ва қанча тежалди.</p>
 </div>
-<div style="display: flex; gap: 8px"><button type="button" class="rbtn" data-dir="-1" aria-label="Олдинги">‹</button><button type="button" class="rbtn" data-dir="1" aria-label="Кейинги">›</button></div>
-</div>
-<div class="reels-track" id="reelsTrack"></div>
+<div class="reels-track" id="reelsTrack" aria-roledescription="carousel"></div>
+<div class="rctl"><button type="button" class="rbtn" data-dir="-1" aria-label="Олдинги">‹</button><span class="rcount" id="reelCount">01 / 05</span><button type="button" class="rbtn" data-dir="1" aria-label="Кейинги">›</button><a class="rig" href="https://www.instagram.com/komron_ayti/" target="_blank" rel="noopener">Instagram’да кўриш ↗</a></div>
 </div>
 </section>
 
