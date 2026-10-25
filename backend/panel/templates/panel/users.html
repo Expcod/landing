@@ -1,0 +1,19 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Фойдаланувчилар{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Фойдаланувчилар</h1><p>Панелга ким кира олади. Менежер аризалар ва ҳисоботларни кўради, супер админ — ҳаммасини.</p></div>
+  <a class="btn btn-primary" href="{% url 'panel:user_new' %}"><svg class="i"><use href="#i-plus"/></svg>Янги фойдаланувчи</a>
+</div>
+<div class="people">
+  {% for u in users %}
+  <a class="card person" href="{% url 'panel:user' u.pk %}" style="color:inherit;text-decoration:none">
+    <span class="avatar">{{ u.get_full_name|default:u.username|initials }}</span>
+    <div class="txt"><b>{{ u.get_full_name|default:u.username }}</b>{% if u == user %} <span class="muted">(сиз)</span>{% endif %}
+      <small>{{ u.username }} · {% if u.last_login %}охирги кириш {{ u.last_login|ago }}{% else %}ҳали кирмаган{% endif %}</small></div>
+    {% if not u.is_active %}<span class="pill">Ўчирилган</span>{% elif not u.is_staff %}<span class="pill">Панелга кира олмайди</span>{% elif u.is_superuser %}<span class="pill brand">Супер админ</span>{% else %}<span class="pill">Менежер</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

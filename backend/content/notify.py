@@ -273,3 +273,46 @@ def _run(pk):
 def sync_later(lead):
     pk = lead.pk
     transaction.on_commit(lambda: threading.Thread(target=_run, args=(pk,), daemon=True).start())
+
+
+# ---------- Панел учун ёрдамчилар ----------
+
+def tg_check(s):
+    """(ok, матн): бот токени тўғрими ва webhook уланганми."""
+    if not s.tg_token:
+        return False, 'Бот токени киритилмаган.'
+    try:
+        me = tg(s, 'getMe')['result']
+        hook = tg(s, 'getWebhookInfo')['result']
+    except Exception as e:  # noqa: BLE001
+        return False, f'Telegram жавоб бермади ёки токен нотўғри: {e}'
+    if not hook.get('url'):
+        return False, f'@{me["username"]} топилди, лекин сайтга уланмаган. Созламаларни сақланг.'
+    err = hook.get('last_error_message')
+    return (not err), f'@{me["username"]} уланган.' + (f' Охирги хато: {err}' if err else '')
+
+
+def odoo_check(s):
+    """(ok, матн): Odoo манзили ва Meta Ads калити тўғрими. Бўш сўров ариза яратмайди."""
+    if not (s.odoo_url and s.odoo_db and s.odoo_api_key):
+        return False, 'Odoo манзили, базаси ва калити тўлдирилмаган.'
+    try:
+        res = _post(f'{odoo_base(s)}/instagram_ads/api/lead?db={s.odoo_db}', {}, {'X-API-Key': s.odoo_api_key})
+        msg = str(res.get('error') or '')
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+    if 'kalit' in msg.lower() or msg.startswith('403'):
+        return False, 'Odoo калитни қабул қилмади. Meta Ads → Sozlash\'даги «Lead API kaliti»ни текширинг.'
+    if 'Kamida' in msg:
+        return True, 'Odoo CRM уланган, калит тўғри.'
+    return False, f'Odoo жавоби кутилгандек эмас: {msg[:200]}'
+
+
+def set_subscriber_status(s, sub, status):
+    """Панелдан рухсат бериш / рад этиш — обуначига ҳам хабар боради."""
+    if sub.status == status:
+        return
+    sub.status = status
+    sub.save(update_fields=['status'])
+    if s.tg_token and status in (sub.APPROVED, sub.REJECTED):
+        _say(s, sub.chat_id, APPROVED_MSG if status == sub.APPROVED else REJECTED_MSG)

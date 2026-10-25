@@ -1,0 +1,36 @@
+{% extends "panel/base.html" %}
+{% block title %}Созламалар{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Созламалар</h1><p>Аризалар қаерга боришини ва сайт аналитикасини бошқаради.</p></div>
+  <form method="post">{% csrf_token %}<button class="btn" name="action" value="check"><svg class="i"><use href="#i-refresh"/></svg>Уланишни текшириш</button></form>
+</div>
+
+{% if checks %}<div class="stack" style="gap:10px;margin-bottom:20px;max-width:760px">
+  {% for key, res in checks.items %}<div class="alert {% if not res.0 %}bad{% endif %}" style="margin:0;{% if res.0 %}background:var(--ok-soft){% endif %}">
+    <svg class="i" {% if res.0 %}style="color:var(--ok)"{% endif %}><use href="#i-{% if res.0 %}check{% else %}alert{% endif %}"/></svg>
+    <span><b>{% if key == 'tg' %}Telegram{% else %}Odoo CRM{% endif %}:</b> {{ res.1 }}</span></div>{% endfor %}
+</div>{% endif %}
+
+<form method="post" class="form-wrap stack">
+  {% csrf_token %}<input type="hidden" name="action" value="save">
+  <section class="card card-pad">
+    <h2>Telegram бот</h2>
+    <p class="sub">Токенни @BotFather беради. Сақлаганингизда бот сайтга ўзи уланади.</p>
+    {% with f=form.tg_token %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}
+    <label class="muted" style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" name="reconnect"> Ботни сайтга қайта улаш (токен ўзгармаган бўлса ҳам)</label>
+  </section>
+  <section class="card card-pad">
+    <h2>Odoo CRM — Meta Ads</h2>
+    <p class="sub">Аризалар Meta Ads модулига «Yangi» босқичига тушади. Калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».</p>
+    <div class="field-row">{% with f=form.odoo_url %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}{% with f=form.odoo_db %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}</div>
+    {% with f=form.odoo_api_key %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}
+  </section>
+  <section class="card card-pad">
+    <h2>Реклама аналитикаси</h2>
+    <p class="sub">Meta Pixel сайтдаги аризаларни Facebook/Instagram рекламасига қайтаради.</p>
+    {% with f=form.pixel_id %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}
+  </section>
+  <div><button class="btn btn-primary">Созламаларни сақлаш</button></div>
+</form>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 
 from content.reports import reports
 from content.views import content, lead, tg_webhook, track
@@ -7,6 +7,7 @@ from content.views import content, lead, tg_webhook, track
 urlpatterns = [
     path('admin/reports/', admin.site.admin_view(reports), name='reports'),
     path('admin/', admin.site.urls),
+    path('panel/', include('panel.urls')),
     path('api/content/', content),
     path('api/lead/', lead),
     path('api/track/', track),

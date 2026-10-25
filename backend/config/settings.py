@@ -36,6 +36,7 @@ CSRF_COOKIE_SECURE = True
 # Application definition
 
 INSTALLED_APPS = [
+    'panel',
     'content',  # админ шаблонларини (Ҳисоботлар тугмаси) устидан ёзиши учун биринчи турибди
     'django.contrib.admin',
     'django.contrib.auth',
@@ -68,6 +69,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'panel.context.counters',
             ],
         },
     },
@@ -130,5 +132,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+
+LOGIN_URL = '/panel/login/'
+LOGIN_REDIRECT_URL = '/panel/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

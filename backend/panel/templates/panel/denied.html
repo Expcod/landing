@@ -1,0 +1,9 @@
+{% extends "panel/base.html" %}
+{% block title %}Рухсат йўқ{% endblock %}
+{% block content %}
+<div class="card empty" style="max-width:520px;margin:40px auto">
+  <b>Бу бўлим сизга ёпиқ</b>
+  <p>Бу саҳифани фақат супер админ очади. Керак бўлса, раҳбардан рухсат сўранг.</p>
+  <a class="btn" href="{% url 'panel:dashboard' %}">Бош саҳифага қайтиш</a>
+</div>
+{% endblock %}

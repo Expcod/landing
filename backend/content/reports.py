@@ -27,8 +27,8 @@ def with_bars(rows, key):
     return rows
 
 
-def reports(request):
-    period = request.GET.get('d', '7')
+def report_data(period):
+    """Ҳисобот маълумотлари: Django admin'даги ва /panel/'даги ҳисоботлар учун умумий."""
     if period not in PERIODS:
         period = '7'
     now = timezone.localtime()
@@ -93,8 +93,8 @@ def reports(request):
                  .annotate(n=Count('id', distinct=True), leads=Count('id', filter=lead_q, distinct=True)).order_by('day'))
     daily = with_bars(daily, 'n')
 
-    ctx = {
-        **admin.site.each_context(request), 'title': 'Ҳисоботлар', 'period': period, 'periods': PERIODS,
+    return {
+        'period': period, 'periods': PERIODS, 'total': total,
         'kpi': [
             ('Ташрифлар', total), ('Ноёб меҳмонлар', visits.values('vid').distinct().count()),
             ('Ўртача вақт', '%d:%02d' % divmod(int(agg['dur'] or 0), 60)), ('Ўртача тушиш', '%d%%' % (agg['scroll'] or 0)),
@@ -104,4 +104,8 @@ def reports(request):
         'campaigns': grouped('campaign'), 'devices': grouped('device', 3), 'videos': videos,
         'clicks': clicks, 'daily': daily,
     }
+
+
+def reports(request):
+    ctx = {**admin.site.each_context(request), 'title': 'Ҳисоботлар', **report_data(request.GET.get('d', '7'))}
     return render(request, 'admin/content/reports.html', ctx)

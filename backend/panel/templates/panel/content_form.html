@@ -1,0 +1,26 @@
+{% extends "panel/base.html" %}
+{% block title %}{% if obj %}{{ obj }}{% else %}Янги {{ meta.one }}{% endif %}{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'panel:content' kind %}"><svg class="i"><use href="#i-back"/></svg>{{ meta.title }}</a>
+<div class="page-head"><div><h1>{% if obj %}{{ obj }}{% else %}Янги {{ meta.one }}{% endif %}</h1><p>{{ meta.hint }}</p></div></div>
+<div class="form-wrap">
+  <form method="post" enctype="multipart/form-data" class="card card-pad" id="content-form">
+    {% csrf_token %}
+    {% for e in form.non_field_errors %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg>{{ e }}</div>{% endfor %}
+    <div class="field-row">
+      {% for f in form %}{% if f.field.widget.input_type == 'text' or f.field.widget.input_type == 'number' or f.field.widget.input_type == 'url' %}{% include "panel/_field.html" %}{% endif %}{% endfor %}
+    </div>
+    {% for f in form %}{% if f.field.widget.input_type != 'text' and f.field.widget.input_type != 'number' and f.field.widget.input_type != 'url' %}{% include "panel/_field.html" %}{% endif %}{% endfor %}
+    <div class="form-foot">
+      <button class="btn btn-primary" type="submit">Сақлаш</button>
+      <a class="btn btn-ghost" href="{% url 'panel:content' kind %}">Бекор қилиш</a>
+    </div>
+  </form>
+  {% if obj %}
+  <form method="post" action="{% url 'panel:content_delete' kind obj.pk %}" style="margin-top:16px"
+        data-confirm="«{{ obj }}» сайтдан ва базадан ўчирилади. Буни қайтариб бўлмайди." data-confirm-title="Ўчирасизми?">
+    {% csrf_token %}<button class="btn btn-danger btn-s"><svg class="i"><use href="#i-trash"/></svg>Ўчириш</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

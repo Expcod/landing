@@ -1,0 +1,26 @@
+{% extends "panel/base.html" %}
+{% block title %}Кириш{% endblock %}
+{% block body %}
+<div class="login">
+  <section class="login-art">
+    <span class="brand"><span class="brand-mark">N</span><span><b>Nova Code</b><small>Бошқарув панели</small></span></span>
+    <div>
+      <h1>Ҳар бир ариза — қўнғироқ кутаётган завод</h1>
+      <p>Сайтдан келган аризалар, уларнинг ҳолати, сайт контенти ва ҳисоботлар — ҳаммаси шу ерда.</p>
+      <div class="flow"><span>Янги</span><span>Қўнғироқ қилинди</span><span>Аудит белгиланди</span></div>
+    </div>
+  </section>
+  <section class="login-form">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <h2>Панелга кириш</h2>
+      <p class="muted" style="margin:0 0 24px">Логин ва паролингизни киритинг.</p>
+      {% if form.errors %}<div class="alert bad" role="alert"><svg class="i"><use href="#i-alert"/></svg><span>Логин ёки парол нотўғри. Катта-кичик ҳарфларни текширинг.</span></div>{% endif %}
+      <div class="field"><label for="id_username">Логин</label><input class="input" id="id_username" name="username" autocomplete="username" autocapitalize="none" value="{{ form.username.value|default:'' }}" required autofocus></div>
+      <div class="field"><label for="id_password">Парол</label><input class="input" id="id_password" type="password" name="password" autocomplete="current-password" required></div>
+      <input type="hidden" name="next" value="{{ next|default:'/panel/' }}">
+      <button class="btn btn-primary" type="submit">Кириш</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

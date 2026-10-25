@@ -1,0 +1,65 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Аризалар{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Аризалар</h1>
+    <p>{% if view == 'board' %}Карточкани бошқа устунга судраб ёки ундаги рўйхатдан ҳолатни ўзгартиринг.{% else %}{{ total }} та ариза.{% endif %}</p>
+  </div>
+  <div class="actions">
+    <div class="seg" role="tablist" aria-label="Кўриниш">
+      <a href="?view=board&q={{ q|urlencode }}&d={{ period }}" class="{% if view == 'board' %}on{% endif %}">Доска</a>
+      <a href="?view=list&q={{ q|urlencode }}&d={{ period }}" class="{% if view == 'list' %}on{% endif %}">Рўйхат</a>
+    </div>
+    {% if user.is_superuser %}<a class="btn" href="{% url 'panel:leads_csv' %}?q={{ q|urlencode }}&d={{ period }}"><svg class="i"><use href="#i-down"/></svg>Excel'га</a>{% endif %}
+  </div>
+</div>
+
+<form class="actions" method="get" style="margin-bottom:18px">
+  <input type="hidden" name="view" value="{{ view }}">
+  <label class="search"><span class="sr">Қидириш</span><svg class="i"><use href="#i-search"/></svg>
+    <input class="input" type="search" name="q" value="{{ q }}" placeholder="Исм, телефон, соҳа…"></label>
+  <input type="hidden" name="d" value="{{ period }}">
+  <div class="seg">{% for k, v in periods.items %}<a href="?view={{ view }}&q={{ q|urlencode }}&d={{ k }}" class="{% if k == period %}on{% endif %}">{{ v }}</a>{% endfor %}</div>
+</form>
+
+{% if view == 'board' %}
+<div class="col-tabs"><div class="seg">{% for c in columns %}<button type="button" data-col="{{ c.key }}" class="{% if forloop.first %}on{% endif %}">{{ c.name }} <span class="n muted">{{ c.count }}</span></button>{% endfor %}</div></div>
+<div class="board">
+  {% for c in columns %}
+  <section class="column {% if forloop.first %}is-shown{% endif %}" data-status="{{ c.key }}" aria-label="{{ c.name }}">
+    <div class="column-head"><span class="dotc"></span><b>{{ c.name }}</b><span class="n">{{ c.count }}</span></div>
+    <div class="column-hint">{{ c.hint }}</div>
+    <div class="column-body">
+      {% for l in c.items %}{% include "panel/_lead_card.html" %}{% endfor %}
+    </div>
+    {% if c.count > c.items|length %}<p class="muted" style="font-size:13px;padding:10px 6px 0;margin:0">Охирги {{ c.items|length }} таси. Қолганлари — <a href="?view=list&q={{ q|urlencode }}&d={{ period }}">рўйхатда</a>.</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  {% if page.object_list %}
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Ариза</th><th>Телефон</th><th>Фаолият тури</th><th>Ҳолати</th><th>Юборилди</th><th class="num">Вақти</th></tr></thead>
+    <tbody>{% for l in page.object_list %}<tr>
+      <td><a href="{% url 'panel:lead' l.pk %}" style="font-weight:600;color:var(--ink)">{{ l.name }}</a>{% if l.problem %}<div class="muted" style="font-size:13px">{{ l.problem|truncatechars:60 }}</div>{% endif %}</td>
+      <td class="nowrap"><a href="tel:{{ l.phone|tel }}">{{ l.phone|phone }}</a></td>
+      <td>{{ l.business|default:"—" }}</td>
+      <td>{% include "panel/_status_pill.html" %}</td>
+      <td class="nowrap">{% if l.sync_error %}<span class="pill bad" title="{{ l.sync_error }}">Хато</span>{% else %}{% if l.tg_sent %}<span class="pill">Telegram</span>{% endif %} {% if l.odoo_id is not None %}<span class="pill">CRM</span>{% endif %}{% endif %}</td>
+      <td class="num">{{ l.created|ago }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% if page.has_other_pages %}<div class="actions" style="padding:14px 16px;border-top:1px solid var(--line);justify-content:space-between">
+    <span class="muted">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+    <span class="actions">{% if page.has_previous %}<a class="btn btn-s" href="?view=list&q={{ q|urlencode }}&d={{ period }}&p={{ page.previous_page_number }}">Олдинги</a>{% endif %}
+    {% if page.has_next %}<a class="btn btn-s" href="?view=list&q={{ q|urlencode }}&d={{ period }}&p={{ page.next_page_number }}">Кейинги</a>{% endif %}</span>
+  </div>{% endif %}
+  {% else %}
+  <div class="empty"><b>Ҳеч нарса топилмади</b>{% if q %}«{{ q }}» бўйича ариза йўқ. Бошқа сўз билан қидириб кўринг.{% else %}Бу даврда ариза келмаган.{% endif %}</div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

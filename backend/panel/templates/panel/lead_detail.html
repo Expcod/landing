@@ -1,0 +1,73 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}{{ lead.name }}{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'panel:leads' %}"><svg class="i"><use href="#i-back"/></svg>Аризалар</a>
+<div class="card card-pad" style="margin-bottom:20px">
+  <div class="hero-lead">
+    <span class="avatar">{{ lead.name|initials }}</span>
+    <div><h1>{{ lead.name }}</h1><div class="when">{{ lead.created|date:"d.m.Y, H:i" }} · {{ lead.created|ago }}</div></div>
+    <a class="call" href="tel:{{ lead.phone|tel }}"><svg class="i"><use href="#i-phone"/></svg>{{ lead.phone|phone }}</a>
+  </div>
+</div>
+
+<div class="detail">
+  <div class="stack">
+    <section class="card card-pad">
+      <h2>Ариза</h2>
+      <p class="sub">Мижоз формада ёзган маълумотлар.</p>
+      <dl class="facts">
+        <dt>Фаолият тури</dt><dd>{{ lead.business|default:"—" }}</dd>
+        <dt>Ҳозирги муаммо</dt><dd>{{ lead.problem|default:"—"|linebreaksbr }}</dd>
+        {% if visit %}<dt>Қаердан келди</dt><dd>{{ visit.source|default:"—" }}{% if visit.campaign %} · {{ visit.campaign }}{% endif %}</dd>
+        <dt>Қурилма</dt><dd>{% if visit.device == 'mobile' %}Телефон{% else %}Компьютер{% endif %}</dd>
+        <dt>Сайтда</dt><dd>{{ visit.duration|mmss }} дақиқа, {{ visit.max_scroll }}% гача тушди</dd>{% endif %}
+        <dt>Саҳифа</dt><dd class="muted">{{ lead.page|default:"—" }}</dd>
+      </dl>
+    </section>
+
+    <section class="card card-pad">
+      <h2>Изоҳ</h2>
+      <p class="sub">Қўнғироқ натижаси, келишилган вақт — фақат панелда кўринади.</p>
+      <form method="post">{% csrf_token %}<input type="hidden" name="action" value="note">
+        <div class="field" style="margin-bottom:12px"><label class="sr" for="note">Изоҳ</label><textarea class="input" id="note" name="note" rows="4" placeholder="Масалан: 15:00 да қайта қўнғироқ, директор билан гаплашиш керак">{{ lead.note }}</textarea></div>
+        <button class="btn btn-primary">Изоҳни сақлаш</button>
+      </form>
+    </section>
+
+    {% if events %}<section class="card card-pad">
+      <h2>Сайтда нима қилди</h2>
+      <p class="sub">Шу ташрифдаги ҳаракатлар.</p>
+      <ul class="timeline">{% for e in events %}<li><time>{{ e.created|date:"H:i" }}</time><span>{% if e.name == 'lead_sent' %}Ариза юборди{% elif e.name == 'form_view' %}Формани кўрди{% elif e.name == 'form_start' %}Формани тўлдира бошлади{% elif e.name == 'video_start' %}Видео бошлади{% elif e.name == 'video_complete' %}Видеони охиригача кўрди{% elif e.name == 'video_50' %}Видеонинг ярмини кўрди{% elif e.name == 'click_cta' %}«Бепул аудит» тугмасини босди{% elif e.name == 'click_phone' %}Телефонни босди{% elif e.name == 'click_telegram' %}Telegram'ни босди{% else %}{{ e.name }}{% endif %}{% if e.label %} <span class="muted">— {{ e.label }}</span>{% endif %}</span></li>{% endfor %}</ul>
+    </section>{% endif %}
+    {% if user.is_superuser %}<form method="post" data-confirm="«{{ lead.name }}» аризаси бутунлай ўчирилади. CRM'даги нусхаси қолади." data-confirm-title="Аризани ўчирасизми?">
+      {% csrf_token %}<button class="btn btn-danger btn-s" name="action" value="delete"><svg class="i"><use href="#i-trash"/></svg>Аризани ўчириш</button>
+    </form>{% endif %}
+  </div>
+
+  <div class="stack detail-side">
+    <section class="card card-pad">
+      <h2>Ҳолати</h2>
+      <p class="sub">Босишингиз билан сақланади.</p>
+      <div class="status-pick" data-url="{% url 'panel:lead_status' lead.pk %}">
+        {% for k, v in statuses %}<button type="button" data-value="{{ k }}" class="{% if k == lead.status %}on{% endif %}">{{ v }}</button>{% endfor %}
+      </div>
+    </section>
+
+    <section class="card card-pad">
+      <h2>Telegram ва CRM</h2>
+      <p class="sub">Ариза қаерга етиб борди.</p>
+      <div class="actions" style="margin-bottom:12px">
+        <span class="pill {% if lead.tg_sent %}ok{% endif %}"><svg class="i" style="width:14px;height:14px"><use href="#i-{% if lead.tg_sent %}check{% else %}x{% endif %}"/></svg>Telegram</span>
+        <span class="pill {% if lead.odoo_id is not None %}ok{% endif %}"><svg class="i" style="width:14px;height:14px"><use href="#i-{% if lead.odoo_id is not None %}check{% else %}x{% endif %}"/></svg>Odoo CRM</span>
+      </div>
+      {% if lead.sync_error %}<p style="color:var(--bad);font-size:13px;margin:0 0 12px">{{ lead.sync_error|linebreaksbr }}</p>{% endif %}
+      <div class="actions">
+        {% if crm_url %}<a class="btn btn-s" href="{{ crm_url }}" target="_blank" rel="noopener"><svg class="i"><use href="#i-crm"/></svg>CRM'да очиш</a>{% endif %}
+        {% if not lead.tg_sent or lead.odoo_id is None %}<form method="post">{% csrf_token %}<button class="btn btn-s" name="action" value="resend"><svg class="i"><use href="#i-refresh"/></svg>Қайта юбориш</button></form>{% endif %}
+      </div>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

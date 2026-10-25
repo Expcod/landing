@@ -1,0 +1,1 @@
+<span class="pill {% if l.status == 'new' %}brand{% elif l.status == 'called' %}wait{% elif l.status == 'meeting' %}ok{% else %}bad{% endif %}">{{ l.get_status_display }}</span>

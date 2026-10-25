@@ -1,0 +1,18 @@
+{% with w=f.field.widget.input_type %}
+<div class="field {% if w == 'checkbox' %}check{% endif %} {% if f.errors %}has-err{% endif %}">
+  {% if w == 'checkbox' %}
+    {{ f }}<label for="{{ f.id_for_label }}">{{ f.label }}</label>
+  {% elif w == 'file' %}
+    <span class="label">{{ f.label }}</span>
+    {% if f.value %}<div class="preview">{% if '.mp4' in f.value.url or '.webm' in f.value.url or '.mov' in f.value.url %}<video src="{{ f.value.url }}" muted></video>{% else %}<img src="{{ f.value.url }}" alt="">{% endif %}
+      <span class="muted" style="font-size:13px;overflow-wrap:anywhere">Ҳозирги файл. Алмаштириш учун янгисини танланг.</span></div>
+      {% if not f.field.required %}<label class="muted" style="font-size:13px;display:flex;gap:8px;align-items:center"><input type="checkbox" name="{{ f.html_name }}-clear"> Файлни олиб ташлаш</label>{% endif %}{% endif %}
+    <label class="picker"><input type="file" class="sr" name="{{ f.html_name }}" id="{{ f.id_for_label }}"><span class="btn btn-s"><svg class="i"><use href="#i-image"/></svg>{% if f.value %}Бошқа файл танлаш{% else %}Файл танлаш{% endif %}</span><span class="muted picked">Файл танланмаган</span></label>
+  {% else %}
+    <label for="{{ f.id_for_label }}">{{ f.label }}{% if not f.field.required and not no_opt %} <span class="muted" style="font-weight:400">(ихтиёрий)</span>{% endif %}</label>
+    {{ f }}
+  {% endif %}
+  {% if f.help_text %}<span class="help">{{ f.help_text }}</span>{% endif %}
+  {% for e in f.errors %}<span class="err">{{ e }}</span>{% endfor %}
+</div>
+{% endwith %}

@@ -1,0 +1,10 @@
+{% load panel_tags %}<article class="lcard" data-name="{{ l.name }}" data-status-url="{% url 'panel:lead_status' l.pk %}">
+  <div class="top"><a class="name" href="{% url 'panel:lead' l.pk %}">{{ l.name }}</a><span class="time">{{ l.created|ago }}</span></div>
+  <div class="meta">{{ l.business|default:"Соҳа кўрсатилмаган" }}{% if l.problem %} — {{ l.problem }}{% endif %}</div>
+  <div class="bottom">
+    <a class="call" href="tel:{{ l.phone|tel }}" aria-label="Қўнғироқ: {{ l.phone }}"><svg class="i"><use href="#i-phone"/></svg>{{ l.phone|phone }}</a>
+    <span class="icons">{% if l.note %}<span title="Изоҳ бор: {{ l.note|truncatechars:80 }}">✎</span>{% endif %}{% if l.sync_error %}<svg class="i err" aria-label="Юборишда хато"><title>{{ l.sync_error }}</title><use href="#i-alert"/></svg>{% endif %}</span>
+    <label class="sr" for="st{{ l.pk }}">Ҳолати</label>
+    <select class="input" id="st{{ l.pk }}" data-status>{% for k, v in statuses %}<option value="{{ k }}" {% if k == l.status %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+  </div>
+</article>

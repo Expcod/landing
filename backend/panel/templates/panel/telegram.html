@@ -1,0 +1,48 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Telegram бот{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Telegram бот</h1>
+    <p>{% if bot %}Одамлар <a href="https://t.me/{{ bot }}" target="_blank" rel="noopener">@{{ bot }}</a> га /start босади, сиз рухсат берасиз — шундан кейин янги аризалар уларга келади. Админлар рухсат сўровини ботнинг ўзида ҳам олади.{% elif has_token %}Бот токени киритилган, лекин Telegram жавоб бермади. Созламаларда текширинг.{% else %}Аввал созламаларда бот токенини киритинг.{% endif %}</p></div>
+  <a class="btn" href="{% url 'panel:settings' %}"><svg class="i"><use href="#i-gear"/></svg>Бот созламалари</a>
+</div>
+
+{% for key, title, subs in groups %}
+<h2 class="section-title">{{ title }} <span class="pill {% if key == 'pending' %}wait{% elif key == 'approved' %}ok{% else %}bad{% endif %}">{{ subs|length }}</span></h2>
+{% if subs %}
+<div class="people">
+  {% for s in subs %}
+  <div class="card person">
+    <span class="avatar">{{ s.name|initials }}</span>
+    <div class="txt">
+      <b>{{ s.name }}</b>{% if s.is_admin %} <span class="pill brand">Админ</span>{% endif %}{% if s.is_group %} <span class="pill">Гуруҳ</span>{% endif %}{% if not s.active %} <span class="pill">Тўхтатган</span>{% endif %}
+      <small>{% if s.username %}@{{ s.username }} · {% endif %}{{ s.created|ago }} қўшилган</small>
+    </div>
+    <div class="actions">
+      <form method="post">{% csrf_token %}<input type="hidden" name="id" value="{{ s.pk }}">
+        {% if key == 'pending' %}
+          <button class="btn btn-ok btn-s" name="action" value="approve"><svg class="i"><use href="#i-check"/></svg>Рухсат бериш</button>
+        {% elif key == 'rejected' %}
+          <button class="btn btn-s" name="action" value="approve">Рухсат бериш</button>
+        {% else %}
+          <button class="btn btn-ghost btn-s" name="action" value="pause">{% if s.active %}Тўхтатиш{% else %}Қайта ёқиш{% endif %}</button>
+          {% if not s.is_group %}<button class="btn btn-ghost btn-s" name="action" value="admin">{% if s.is_admin %}Админликдан олиш{% else %}Админ қилиш{% endif %}</button>{% endif %}
+        {% endif %}
+      </form>
+      {% if key != 'rejected' and not s.is_admin %}
+      <form method="post" data-confirm="{{ s.name }}га аризалар бормайди. Кейин «Рад этилган» рўйхатидан қайта рухсат бериш мумкин." data-confirm-title="Рад этасизми?" data-confirm-ok="Ҳа, рад этиш">
+        {% csrf_token %}<input type="hidden" name="id" value="{{ s.pk }}"><button class="btn btn-danger btn-s" name="action" value="reject">Рад этиш</button></form>
+      {% elif key == 'rejected' %}
+      <form method="post" data-confirm="{{ s.name }} рўйхатдан бутунлай ўчирилади. /start босса, яна рухсат сўрайди." data-confirm-title="Рўйхатдан ўчирасизми?">
+        {% csrf_token %}<input type="hidden" name="id" value="{{ s.pk }}"><button class="btn btn-ghost btn-s" name="action" value="delete" aria-label="Ўчириш"><svg class="i"><use href="#i-trash"/></svg></button></form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty" style="padding:22px">{% if key == 'pending' %}Рухсат кутаётган одам йўқ.{% elif key == 'approved' %}Ҳали ҳеч кимга рухсат берилмаган. Ботга /start босинг ва ўзингизни админ қилинг.{% else %}Рад этилганлар йўқ.{% endif %}</div>
+{% endif %}
+{% endfor %}
+{% endblock %}

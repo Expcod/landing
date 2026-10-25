@@ -1,0 +1,49 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Бош саҳифа{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Салом, {{ user.first_name|default:user.username }}</h1>
+    <p>{% if waiting_count %}{{ waiting_count }} та ариза қўнғироқ кутмоқда. Энг эскисидан бошланг.{% else %}Ҳамма аризаларга жавоб берилган.{% endif %}</p>
+  </div>
+  <a class="btn" href="{% url 'panel:leads' %}"><svg class="i"><use href="#i-inbox"/></svg>Барча аризалар</a>
+</div>
+
+{% if pending_subs %}<div class="alert"><svg class="i"><use href="#i-tg"/></svg><span>{{ pending_subs }} киши Telegram ботдан аризаларни олиш учун рухсат кутмоқда.</span><a class="btn btn-s" href="{% url 'panel:telegram' %}">Кўриш</a></div>{% endif %}
+{% if failed %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg><span>{{ failed }} та ариза Telegram ёки CRM'га етиб бормади.</span><a class="btn btn-s" href="{% url 'panel:leads' %}?view=list">Кўриш</a></div>{% endif %}
+
+<div class="dash">
+  <section class="card">
+    <div class="queue-head">
+      <div><h2>Қўнғироқ кутаётганлар</h2><p class="sub" style="margin:2px 0 0">«Янги» ҳолатдаги аризалар, энг эскиси тепада.</p></div>
+      <span class="queue-big">{{ waiting_count }}</span>
+    </div>
+    {% for l in waiting %}
+    <div class="lead-row">
+      <span class="avatar">{{ l.name|initials }}</span>
+      <div class="who"><a href="{% url 'panel:lead' l.pk %}">{{ l.name }}</a><small>{{ l.created|ago }}{% if l.business %} · {{ l.business }}{% endif %}{% if l.problem %} · {{ l.problem }}{% endif %}</small></div>
+      <a class="call" href="tel:{{ l.phone|tel }}"><svg class="i"><use href="#i-phone"/></svg>{{ l.phone|phone }}</a>
+    </div>
+    {% empty %}
+    <div class="empty" style="border-top:1px solid var(--line)"><b>Навбат бўш</b>Янги ариза тушганда шу ерда ва Telegram'да кўринади.</div>
+    {% endfor %}
+    {% if waiting_count > waiting|length %}<div style="padding:12px 20px;border-top:1px solid var(--line)"><a href="{% url 'panel:leads' %}">Яна {{ waiting_count|add:"-6" }} та ариза</a></div>{% endif %}
+  </section>
+
+  <div class="stack">
+    <div class="stats">{% for name, val in stats %}<div class="stat"><span>{{ name }}</span><b>{{ val }}</b></div>{% endfor %}</div>
+    <section class="card card-pad">
+      <h2>Охирги 14 кун</h2>
+      <p class="sub">Ҳар кунги аризалар сони.</p>
+      <div class="chart" role="img" aria-label="Кунлар бўйича аризалар">
+        {% for d in days %}<div class="col" title="{{ d.day|date:'d.m' }}: {{ d.leads }} ариза, {{ d.visits }} ташриф">
+          <span class="val">{% if d.leads %}{{ d.leads }}{% endif %}</span>
+          <div class="colbar {% if d.leads %}has{% endif %}" style="height:{{ d.h }}%"></div>
+          <span class="lbl">{{ d.day|date:'d' }}</span></div>{% endfor %}
+      </div>
+      <p style="margin:14px 0 0"><a href="{% url 'panel:reports' %}">Батафсил ҳисобот</a></p>
+    </section>
+  </div>
+</div>
+{% endblock %}

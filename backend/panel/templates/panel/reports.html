@@ -1,0 +1,82 @@
+{% extends "panel/base.html" %}
+{% block title %}Ҳисоботлар{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Ҳисоботлар</h1><p>Сайтга ким келди, қаергача ўқиди ва нечтаси ариза қолдирди.</p></div>
+  <div class="seg">{% for k, v in periods.items %}<a href="?d={{ k }}" class="{% if k == period %}on{% endif %}">{{ v }}</a>{% endfor %}</div>
+</div>
+
+<div class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:20px">
+  {% for name, val in kpi %}<div class="stat"><span>{{ name }}</span><b>{{ val }}</b></div>{% endfor %}
+</div>
+
+{% if not total %}
+<div class="card empty"><b>Бу даврда ташриф йўқ</b>Маълумот сайтга биринчи меҳмон кирганда пайдо бўлади. Бошқа даврни танлаб кўринг.</div>
+{% else %}
+<div class="stack">
+  <section class="card card-pad">
+    <h2>Воронка</h2>
+    <p class="sub">Ҳар бир қадамга етган ташрифлар ва шу қадамда тушиб қолганлар.</p>
+    <div class="tbl-wrap"><table class="tbl"><tbody>
+      {% for r in funnel %}<tr><td>{{ r.name }}{% if r.lost > 0 %} <span style="color:var(--bad);font-size:12px">−{{ r.lost }}</span>{% endif %}</td>
+      <td class="num">{{ r.n }}</td><td class="num muted">{{ r.pct }}%</td><td style="width:42%"><div class="bar ok" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <div class="dash" style="grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr))">
+    <section class="card card-pad">
+      <h2>Қаердан келди</h2>
+      <p class="sub">UTM тег бўлса — шу ном, бўлмаса қайси сайтдан ўтгани.</p>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Манба</th><th class="num">Ташриф</th><th class="num">Ариза</th><th class="num">Конв.</th></tr></thead><tbody>
+        {% for r in sources %}<tr><td>{{ r.name }}<div class="bar" style="width:{{ r.bar }}%;margin-top:6px;height:5px"></div></td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.conv }}%</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="card card-pad">
+      <h2>Саҳифада қаергача тушди</h2>
+      <p class="sub">«Етди» — бўлимни кўрганлар, «Чиқди» — сайтни шу ерда ёпганлар.</p>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Бўлим</th><th class="num">Етди</th><th class="num">Чиқди</th></tr></thead><tbody>
+        {% for r in depth %}<tr><td>{{ r.name }}<div class="bar" style="width:{{ r.bar }}%;margin-top:6px;height:5px"></div></td><td class="num">{{ r.reach_pct }}%</td><td class="num">{{ r.exit }} <span class="muted">({{ r.exit_pct }}%)</span></td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="card card-pad">
+      <h2>Сайтда қанча вақт қолди</h2>
+      <p class="sub">Саҳифа очиқ ва экранда турган вақт.</p>
+      <div class="tbl-wrap"><table class="tbl"><tbody>
+        {% for r in times %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td class="num muted">{{ r.pct }}%</td><td style="width:38%"><div class="bar" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    <section class="card card-pad">
+      <h2>Қурилма ва босишлар</h2>
+      <p class="sub">Нечта ташрифда тугма босилди.</p>
+      <div class="tbl-wrap"><table class="tbl"><tbody>
+        {% for r in devices %}<tr><td>{% if r.name == 'mobile' %}Телефондан{% elif r.name == 'desktop' %}Компьютердан{% else %}{{ r.name }}{% endif %}</td><td class="num">{{ r.n }}</td><td class="num muted">{{ r.conv }}% ариза</td></tr>{% endfor %}
+        {% for r in clicks %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td></td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+  </div>
+
+  {% if videos %}<section class="card card-pad">
+    <h2>Видеолар</h2>
+    <p class="sub">Нечта ташрифда видео бошланди ва охиригача кўрилди.</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Видео</th><th class="num">Бошлади</th><th class="num">Ярмигача</th><th class="num">Охиригача</th><th class="num">Овоз ёқди</th></tr></thead><tbody>
+      {% for r in videos %}<tr><td>{{ r.name }}</td><td class="num">{{ r.video_start|default:0 }}</td><td class="num">{{ r.video_50|default:0 }}</td><td class="num">{{ r.video_complete|default:0 }} <span class="muted">({{ r.done_pct }}%)</span></td><td class="num">{{ r.video_unmute|default:0 }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>{% endif %}
+
+  {% if campaigns %}<section class="card card-pad">
+    <h2>Кампаниялар</h2>
+    <p class="sub">Реклама ҳаволасидаги utm_campaign бўйича.</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Кампания</th><th class="num">Ташриф</th><th class="num">Ариза</th><th class="num">Конв.</th></tr></thead><tbody>
+      {% for r in campaigns %}<tr><td>{{ r.name }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.conv }}%</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>{% endif %}
+
+  <section class="card card-pad">
+    <h2>Кунлар бўйича</h2>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Кун</th><th class="num">Ташриф</th><th class="num">Ариза</th><th></th></tr></thead><tbody>
+      {% for r in daily %}<tr><td class="nowrap">{{ r.day|date:"d.m.Y" }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.leads }}</td><td style="width:50%"><div class="bar" style="width:{{ r.bar }}%"></div></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

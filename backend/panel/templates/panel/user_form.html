@@ -1,0 +1,23 @@
+{% extends "panel/base.html" %}
+{% block title %}{% if obj.pk %}{{ obj.username }}{% else %}Янги фойдаланувчи{% endif %}{% endblock %}
+{% block content %}
+<a class="back" href="{% url 'panel:users' %}"><svg class="i"><use href="#i-back"/></svg>Фойдаланувчилар</a>
+<div class="page-head"><div><h1>{% if obj.pk %}{{ obj.get_full_name|default:obj.username }}{% else %}Янги фойдаланувчи{% endif %}</h1></div></div>
+<div class="form-wrap">
+  <form method="post" class="card card-pad" autocomplete="off">
+    {% csrf_token %}
+    {% for e in form.non_field_errors %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg>{{ e }}</div>{% endfor %}
+    <div class="field-row">{% with f=form.first_name %}{% include "panel/_field.html" %}{% endwith %}{% with f=form.last_name %}{% include "panel/_field.html" %}{% endwith %}</div>
+    <div class="field-row">{% with f=form.username %}{% include "panel/_field.html" %}{% endwith %}{% with f=form.password %}{% include "panel/_field.html" %}{% endwith %}</div>
+    <div class="field"><span class="label">Роли</span>
+      <div class="radio-cards">{% for r in form.role %}<label>{{ r.tag }}<span>{{ r.choice_label }}</span></label>{% endfor %}</div>
+      {% for e in form.role.errors %}<span class="err">{{ e }}</span>{% endfor %}</div>
+    {% with f=form.is_active %}{% include "panel/_field.html" %}{% endwith %}
+    <div class="form-foot"><button class="btn btn-primary">Сақлаш</button><a class="btn btn-ghost" href="{% url 'panel:users' %}">Бекор қилиш</a></div>
+  </form>
+  {% if obj.pk and obj != user %}
+  <form method="post" style="margin-top:16px" data-confirm="{{ obj.username }} панелга бошқа кира олмайди. Унинг аризалардаги ишлари сақланади." data-confirm-title="Фойдаланувчини ўчирасизми?">
+    {% csrf_token %}<button class="btn btn-danger btn-s" name="action" value="delete"><svg class="i"><use href="#i-trash"/></svg>Ўчириш</button></form>
+  {% endif %}
+</div>
+{% endblock %}

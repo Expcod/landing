@@ -1,0 +1,14 @@
+{% load panel_tags %}<nav class="nav" aria-label="Бўлимлар">
+  <a href="{% url 'panel:dashboard' %}" class="{% if request.path == '/panel/' %}is-active{% endif %}"><svg class="i"><use href="#i-home"/></svg>Бош саҳифа</a>
+  <a href="{% url 'panel:leads' %}" class="{% active '/panel/leads' %}"><svg class="i"><use href="#i-inbox"/></svg>Аризалар{% if nav_new %}<span class="count">{{ nav_new }}</span>{% endif %}</a>
+  <a href="{% url 'panel:reports' %}" class="{% active '/panel/reports' %}"><svg class="i"><use href="#i-chart"/></svg>Ҳисоботлар</a>
+  {% if user.is_superuser %}
+  <div class="nav-group">Сайт</div>
+  <a href="{% url 'panel:content' 'cases' %}" class="{% active '/panel/content' %}"><svg class="i"><use href="#i-layers"/></svg>Контент</a>
+  <a href="/" target="_blank" rel="noopener"><svg class="i"><use href="#i-site"/></svg>Сайтни очиш</a>
+  <div class="nav-group">Бошқарув</div>
+  <a href="{% url 'panel:telegram' %}" class="{% active '/panel/telegram' %}"><svg class="i"><use href="#i-tg"/></svg>Telegram бот{% if nav_pending %}<span class="count wait">{{ nav_pending }}</span>{% endif %}</a>
+  <a href="{% url 'panel:users' %}" class="{% active '/panel/users' %}"><svg class="i"><use href="#i-users"/></svg>Фойдаланувчилар</a>
+  <a href="{% url 'panel:settings' %}" class="{% active '/panel/settings' %}"><svg class="i"><use href="#i-gear"/></svg>Созламалар</a>
+  {% endif %}
+</nav>
