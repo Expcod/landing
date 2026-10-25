@@ -54,12 +54,11 @@ class ReelAdmin(admin.ModelAdmin):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ['created', 'name', 'phone', 'business', 'status', 'crm', 'tg_sent']
-    list_editable = ['status']
-    list_filter = ['status', 'tg_sent', 'created']
+    list_display = ['created', 'name', 'phone', 'business', 'stage', 'crm', 'tg_sent']
+    list_filter = ['stage', 'tg_sent', 'created']
     search_fields = ['name', 'phone', 'business', 'problem']
     readonly_fields = ['created', 'name', 'phone', 'business', 'problem', 'page', 'ip', 'crm', 'tg_sent', 'sync_error']
-    fields = readonly_fields + ['status', 'note']
+    fields = readonly_fields + ['stage', 'note']
     actions = ['resend']
 
     @admin.display(description='Odoo CRM')

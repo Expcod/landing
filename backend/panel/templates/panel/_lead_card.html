@@ -4,7 +4,7 @@
   <div class="bottom">
     <a class="call" href="tel:{{ l.phone|tel }}" aria-label="Қўнғироқ: {{ l.phone }}"><svg class="i"><use href="#i-phone"/></svg>{{ l.phone|phone }}</a>
     <span class="icons">{% if l.note %}<span title="Изоҳ бор: {{ l.note|truncatechars:80 }}">✎</span>{% endif %}{% if l.sync_error %}<svg class="i err" aria-label="Юборишда хато"><title>{{ l.sync_error }}</title><use href="#i-alert"/></svg>{% endif %}</span>
-    <label class="sr" for="st{{ l.pk }}">Ҳолати</label>
-    <select class="input" id="st{{ l.pk }}" data-status>{% for k, v in statuses %}<option value="{{ k }}" {% if k == l.status %}selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+    <label class="sr" for="st{{ l.pk }}">Босқич</label>
+    <select class="input" id="st{{ l.pk }}" data-status>{% for st in stages %}<option value="{{ st.pk }}" {% if st.pk == l.stage_id or not l.stage_id and forloop.first %}selected{% endif %}>{{ st.name }}</option>{% endfor %}</select>
   </div>
 </article>

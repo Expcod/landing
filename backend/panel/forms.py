@@ -38,10 +38,11 @@ CONTENT_FORMS = {m: content_form(m) for m in (Case, Client, Screen, Reel)}
 class SettingsForm(StyledMixin, forms.ModelForm):
     class Meta:
         model = SiteSettings
-        fields = ['pixel_id', 'tg_token', 'odoo_url', 'odoo_db', 'odoo_api_key']
+        fields = ['pixel_id', 'tg_token', 'odoo_url', 'odoo_db', 'odoo_api_key', 'odoo_user_key']
         widgets = {
             'tg_token': forms.PasswordInput(render_value=True, attrs={'autocomplete': 'off', 'data-reveal': '1'}),
             'odoo_api_key': forms.PasswordInput(render_value=True, attrs={'autocomplete': 'off', 'data-reveal': '1'}),
+            'odoo_user_key': forms.PasswordInput(render_value=True, attrs={'autocomplete': 'off', 'data-reveal': '1'}),
         }
 
     def __init__(self, *a, **kw):

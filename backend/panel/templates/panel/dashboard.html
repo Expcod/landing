@@ -10,13 +10,14 @@
   <a class="btn" href="{% url 'panel:leads' %}"><svg class="i"><use href="#i-inbox"/></svg>Барча аризалар</a>
 </div>
 
+{% if sync_error %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg><span>{{ sync_error }}</span><a class="btn btn-s" href="{% url 'panel:settings' %}">Созламалар</a></div>{% endif %}
 {% if pending_subs %}<div class="alert"><svg class="i"><use href="#i-tg"/></svg><span>{{ pending_subs }} киши Telegram ботдан аризаларни олиш учун рухсат кутмоқда.</span><a class="btn btn-s" href="{% url 'panel:telegram' %}">Кўриш</a></div>{% endif %}
 {% if failed %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg><span>{{ failed }} та ариза Telegram ёки CRM'га етиб бормади.</span><a class="btn btn-s" href="{% url 'panel:leads' %}?view=list">Кўриш</a></div>{% endif %}
 
 <div class="dash">
   <section class="card">
     <div class="queue-head">
-      <div><h2>Қўнғироқ кутаётганлар</h2><p class="sub" style="margin:2px 0 0">«Янги» ҳолатдаги аризалар, энг эскиси тепада.</p></div>
+      <div><h2>Қўнғироқ кутаётганлар</h2><p class="sub" style="margin:2px 0 0">«{{ first_stage.name|default:"Янги" }}» босқичидаги аризалар, энг эскиси тепада.</p></div>
       <span class="queue-big">{{ waiting_count }}</span>
     </div>
     {% for l in waiting %}

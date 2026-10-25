@@ -75,6 +75,24 @@ class Reel(Ordered):
         return self.caption
 
 
+class OdooStage(models.Model):
+    """Odoo'даги Meta Ads босқичлари (instagram.lead.stage) нусхаси. Асосий манба — Odoo."""
+    odoo_id = models.PositiveIntegerField('Odoo ID', unique=True)
+    name = models.CharField('Номи', max_length=100)
+    sequence = models.IntegerField('Тартиб', default=0)
+    is_won = models.BooleanField('Ютилган', default=False)
+    is_lost = models.BooleanField('Йўқотилган', default=False)
+    active = models.BooleanField('Фаол', default=True)
+
+    class Meta:
+        ordering = ['sequence', 'odoo_id']
+        verbose_name = 'Odoo босқичи'
+        verbose_name_plural = 'Odoo босқичлари'
+
+    def __str__(self):
+        return self.name
+
+
 class Lead(models.Model):
     STATUSES = [('new', 'Янги'), ('called', 'Қўнғироқ қилинди'), ('meeting', 'Аудит белгиланди'), ('rejected', 'Рад этилди')]
 
@@ -85,7 +103,8 @@ class Lead(models.Model):
     problem = models.TextField('Ҳозирги муаммо', blank=True)
     page = models.CharField('Саҳифа', max_length=500, blank=True)
     ip = models.GenericIPAddressField('IP', null=True, blank=True)
-    status = models.CharField('Ҳолати', max_length=20, choices=STATUSES, default='new')
+    status = models.CharField('Ҳолати (эски)', max_length=20, choices=STATUSES, default='new')
+    stage = models.ForeignKey(OdooStage, verbose_name='Босқич', null=True, blank=True, on_delete=models.SET_NULL, related_name='leads')
     note = models.TextField('Изоҳ (менеджер учун)', blank=True)
     sid = models.CharField('Ташриф', max_length=40, blank=True)
     odoo_id = models.PositiveIntegerField('Odoo CRM ID', null=True, blank=True)
@@ -109,6 +128,8 @@ class SiteSettings(models.Model):
     odoo_url = models.URLField('Odoo манзили', blank=True, help_text='масалан: https://demo.novaodoo.uz')
     odoo_db = models.CharField('Odoo базаси', max_length=100, blank=True)
     odoo_api_key = models.CharField('Odoo API калити', max_length=100, blank=True)
+    odoo_user_key = models.CharField('Odoo фойдаланувчи API калити', max_length=100, blank=True,
+                                     help_text='Босқичларни Odoo билан синхронлаш учун. Odoo → профил → Account Security → New API Key.')
 
     class Meta:
         verbose_name = 'Созламалар'

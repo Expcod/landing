@@ -1,1 +1,1 @@
-<span class="pill {% if l.status == 'new' %}brand{% elif l.status == 'called' %}wait{% elif l.status == 'meeting' %}ok{% else %}bad{% endif %}">{{ l.get_status_display }}</span>
+{% if st %}<span class="pill {% if st.is_won %}ok{% elif st.is_lost %}bad{% elif st.sequence == stages.0.sequence %}brand{% else %}wait{% endif %}">{{ st.name }}</span>{% else %}<span class="pill brand">{{ stages.0.name|default:"Янги" }}</span>{% endif %}

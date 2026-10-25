@@ -11,6 +11,7 @@
   </div>
 </div>
 
+{% if sync_error %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg><span>{{ sync_error }}</span></div>{% endif %}
 <div class="detail">
   <div class="stack">
     <section class="card card-pad">
@@ -47,10 +48,10 @@
 
   <div class="stack detail-side">
     <section class="card card-pad">
-      <h2>Ҳолати</h2>
-      <p class="sub">Босишингиз билан сақланади.</p>
+      <h2>Босқич</h2>
+      <p class="sub">{% if lead.odoo_id %}Босишингиз билан Odoo CRM'да ҳам ўзгаради.{% else %}Бу ариза Odoo'га етмаган — фақат шу ерда ўзгаради.{% endif %}</p>
       <div class="status-pick" data-url="{% url 'panel:lead_status' lead.pk %}">
-        {% for k, v in statuses %}<button type="button" data-value="{{ k }}" class="{% if k == lead.status %}on{% endif %}">{{ v }}</button>{% endfor %}
+        {% for st in stages %}<button type="button" data-value="{{ st.pk }}" class="{% if st == current_stage %}on{% endif %}">{{ st.name }}</button>{% endfor %}
       </div>
     </section>
 

@@ -9,7 +9,7 @@
 {% if checks %}<div class="stack" style="gap:10px;margin-bottom:20px;max-width:760px">
   {% for key, res in checks.items %}<div class="alert {% if not res.0 %}bad{% endif %}" style="margin:0;{% if res.0 %}background:var(--ok-soft){% endif %}">
     <svg class="i" {% if res.0 %}style="color:var(--ok)"{% endif %}><use href="#i-{% if res.0 %}check{% else %}alert{% endif %}"/></svg>
-    <span><b>{% if key == 'tg' %}Telegram{% else %}Odoo CRM{% endif %}:</b> {{ res.1 }}</span></div>{% endfor %}
+    <span><b>{% if key == 'tg' %}Telegram{% elif key == 'odoo' %}Odoo — янги аризалар{% else %}Odoo — босқичлар{% endif %}:</b> {{ res.1 }}</span></div>{% endfor %}
 </div>{% endif %}
 
 <form method="post" class="form-wrap stack">
@@ -25,6 +25,7 @@
     <p class="sub">Аризалар Meta Ads модулига «Yangi» босқичига тушади. Калит: Odoo → Meta Ads → Sozlash → «Lead API kaliti».</p>
     <div class="field-row">{% with f=form.odoo_url %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}{% with f=form.odoo_db %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}</div>
     {% with f=form.odoo_api_key %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}
+    {% with f=form.odoo_user_key %}{% include "panel/_field.html" with no_opt=1 %}{% endwith %}
   </section>
   <section class="card card-pad">
     <h2>Реклама аналитикаси</h2>

@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import cache_control
 
-from .models import Case, Client, Event, Lead, Reel, Screen, SiteSettings, Visit
+from .models import Case, Client, Event, Lead, OdooStage, Reel, Screen, SiteSettings, Visit
 from . import notify
 from .notify import sync_later
 
@@ -59,6 +59,7 @@ def lead(request):
         name=name, phone=phone, ip=ip,
         business=str(d.get('business', ''))[:200], problem=str(d.get('problem', ''))[:5000],
         page=str(d.get('page', ''))[:500], sid=sid if re.fullmatch(r'[\w-]{8,40}', sid) else '',
+        stage=OdooStage.objects.filter(active=True).first(),
     )
     sync_later(obj)  # Telegram бот ва Odoo CRM'га — фонда
     return JsonResponse({'ok': True})

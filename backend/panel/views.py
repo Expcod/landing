@@ -14,8 +14,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from content import notify
-from content.models import Case, Client, Lead, Reel, Screen, SiteSettings, TgSubscriber, Visit
+from content import notify, odoo_sync
+from content.models import Case, Client, Lead, OdooStage, Reel, Screen, SiteSettings, TgSubscriber, Visit
 from content.reports import SECTION_NAMES, report_data
 
 from .forms import CONTENT_FORMS, SettingsForm, UserForm
@@ -45,6 +45,20 @@ def super_required(view):
     return wrap
 
 
+def _waiting(qs=None):
+    """Биринчи босқичдаги (масалан «Yangi») аризалар — қўнғироқ кутаётганлар."""
+    qs = Lead.objects.all() if qs is None else qs
+    first = odoo_sync.first_stage()
+    return qs.filter(Q(stage=first) | Q(stage__isnull=True)) if first else qs.filter(status='new')
+
+
+def _sync(request, force=False):
+    ok, err = odoo_sync.refresh(force=force)
+    if not ok and request.user.is_superuser:
+        return err
+    return ''
+
+
 # ---------- Бош саҳифа ----------
 
 def _day_start(days_ago=0):
@@ -54,6 +68,7 @@ def _day_start(days_ago=0):
 
 @staff_required
 def dashboard(request):
+    sync_error = _sync(request)
     today, week = _day_start(), _day_start(6)
     leads = Lead.objects.all()
     days = []
@@ -67,8 +82,10 @@ def dashboard(request):
     week_visits = Visit.objects.filter(started__gte=week).count()
     week_leads = leads.filter(created__gte=week).count()
     ctx = {
-        'waiting': leads.filter(status='new').order_by('created')[:6],
-        'waiting_count': leads.filter(status='new').count(),
+        'waiting': _waiting().select_related('stage').order_by('created')[:6],
+        'waiting_count': _waiting().count(),
+        'first_stage': odoo_sync.first_stage(),
+        'sync_error': sync_error,
         'stats': [
             ('Бугунги аризалар', leads.filter(created__gte=today).count()),
             ('7 кунда аризалар', week_leads),
@@ -84,12 +101,6 @@ def dashboard(request):
 
 # ---------- Аризалар ----------
 
-STATUS_HINTS = {
-    'new': 'Ҳали ҳеч ким қўнғироқ қилмаган',
-    'called': 'Гаплашилди, кейинги қадам кутилмоқда',
-    'meeting': 'Аудит учун учрашув белгиланди',
-    'rejected': 'Мижоз қизиқмади ёки мос келмади',
-}
 PERIODS = {'all': 'Ҳаммаси', '1': 'Бугун', '7': '7 кун', '30': '30 кун'}
 
 
@@ -106,16 +117,28 @@ def _filtered_leads(request):
 
 @staff_required
 def leads(request):
+    if request.method == 'POST':  # «Odoo'дан янгилаш»
+        ok, err = odoo_sync.refresh(force=True)
+        (messages.success if ok else messages.error)(request, 'Босқичлар Odoo билан солиштирилди.' if ok else err)
+        return redirect(request.get_full_path())
+    sync_error = _sync(request)
     qs, q, period = _filtered_leads(request)
+    qs = qs.select_related('stage')
     view = 'list' if request.GET.get('view') == 'list' else 'board'
-    ctx = {'q': q, 'period': period, 'periods': PERIODS, 'view': view, 'statuses': Lead.STATUSES,
-           'total': qs.count()}
+    stages = list(OdooStage.objects.filter(active=True))
+    ctx = {'q': q, 'period': period, 'periods': PERIODS, 'view': view, 'stages': stages,
+           'total': qs.count(), 'sync_error': sync_error}
     if view == 'list':
         ctx['page'] = Paginator(qs, 30).get_page(request.GET.get('p'))
     else:
-        counts = dict(qs.values_list('status').annotate(c=Count('id')))
-        ctx['columns'] = [{'key': k, 'name': n, 'hint': STATUS_HINTS[k], 'count': counts.get(k, 0),
-                           'items': qs.filter(status=k)[:60]} for k, n in Lead.STATUSES]
+        counts = dict(qs.values_list('stage').annotate(c=Count('id')))
+        first = stages[0] if stages else None
+        cols = []
+        for st in stages:
+            items = qs.filter(Q(stage=st) | Q(stage__isnull=True)) if st == first else qs.filter(stage=st)
+            n = counts.get(st.pk, 0) + (counts.get(None, 0) if st == first else 0)
+            cols.append({'stage': st, 'count': n, 'items': items[:60]})
+        ctx['columns'] = cols
     return render(request, 'panel/leads.html', ctx)
 
 
@@ -137,9 +160,12 @@ def lead_detail(request, pk):
             messages.success(request, f'«{lead.name}» аризаси ўчирилди.')
             return redirect('panel:leads')
         return redirect('panel:lead', pk=pk)
+    sync_error = _sync(request)
+    lead.refresh_from_db()
     visit = Visit.objects.filter(sid=lead.sid).first() if lead.sid else None
     s = SiteSettings.get()
-    ctx = {'lead': lead, 'visit': visit, 'statuses': Lead.STATUSES, 'section_names': SECTION_NAMES,
+    ctx = {'lead': lead, 'visit': visit, 'stages': OdooStage.objects.filter(active=True), 'sync_error': sync_error,
+           'current_stage': lead.stage or odoo_sync.first_stage(), 'section_names': SECTION_NAMES,
            'crm_url': notify.odoo_link(lead, s) if lead.odoo_id and s.odoo_url else '',
            'events': visit.events.all()[:40] if visit else []}
     return render(request, 'panel/lead_detail.html', ctx)
@@ -149,14 +175,21 @@ def lead_detail(request, pk):
 @require_POST
 def lead_status(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
-    status = request.POST.get('status')
-    if status not in dict(Lead.STATUSES):
-        return JsonResponse({'ok': False}, status=400)
-    lead.status = status
-    lead.save(update_fields=['status'])
-    if request.headers.get('X-Requested-With') == 'fetch':
-        return JsonResponse({'ok': True, 'label': lead.get_status_display()})
-    messages.success(request, f'Ҳолат: {lead.get_status_display()}.')
+    stage = OdooStage.objects.filter(pk=request.POST.get('stage'), active=True).first()
+    fetch = request.headers.get('X-Requested-With') == 'fetch'
+    if not stage:
+        return JsonResponse({'ok': False, 'error': 'Бундай босқич йўқ. Саҳифани янгиланг.'}, status=400)
+    try:
+        odoo_sync.set_stage(lead, stage)
+    except odoo_sync.OdooError as e:
+        msg = f'Odoo босқични қабул қилмади, ҳеч нарса ўзгармади: {e}'
+        if fetch:
+            return JsonResponse({'ok': False, 'error': msg}, status=502)
+        messages.error(request, msg)
+        return redirect('panel:lead', pk=pk)
+    if fetch:
+        return JsonResponse({'ok': True, 'label': stage.name})
+    messages.success(request, f'Босқич: {stage.name}.')
     nxt = request.POST.get('next', '')
     return redirect(nxt) if nxt.startswith('/panel/') else redirect('panel:lead', pk=pk)
 
@@ -168,10 +201,10 @@ def leads_csv(request):
     resp['Content-Disposition'] = f'attachment; filename="arizalar-{timezone.localdate():%Y-%m-%d}.csv"'
     resp.write('﻿')  # Excel кириллни тўғри очиши учун
     w = csv.writer(resp, delimiter=';')
-    w.writerow(['Вақти', 'Исм', 'Телефон', 'Фаолият тури', 'Муаммо', 'Ҳолати', 'Изоҳ', 'Odoo ID'])
-    for l in qs:
+    w.writerow(['Вақти', 'Исм', 'Телефон', 'Фаолият тури', 'Муаммо', 'Босқич', 'Изоҳ', 'Odoo ID'])
+    for l in qs.select_related('stage'):
         w.writerow([timezone.localtime(l.created).strftime('%d.%m.%Y %H:%M'), l.name, l.phone, l.business,
-                    l.problem, l.get_status_display(), l.note, l.odoo_id or ''])
+                    l.problem, l.stage.name if l.stage else '', l.note, l.odoo_id or ''])
     return resp
 
 
@@ -329,7 +362,9 @@ def settings_view(request):
             return redirect('panel:settings')
         if action == 'check':
             form = SettingsForm(instance=s)
-            checks = {'tg': notify.tg_check(s), 'odoo': notify.odoo_check(s)}
+            ok, err = odoo_sync.refresh(force=True)
+            checks = {'tg': notify.tg_check(s), 'odoo': notify.odoo_check(s),
+                      'sync': (ok, f'{OdooStage.objects.filter(active=True).count()} та босқич олинди, аризалар солиштирилди.' if ok else err)}
     return render(request, 'panel/settings.html', {'form': form, 'checks': checks})
 
 

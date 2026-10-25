@@ -5,13 +5,14 @@
 <div class="page-head">
   <div>
     <h1>Аризалар</h1>
-    <p>{% if view == 'board' %}Карточкани бошқа устунга судраб ёки ундаги рўйхатдан ҳолатни ўзгартиринг.{% else %}{{ total }} та ариза.{% endif %}</p>
+    <p>{% if view == 'board' %}Босқичлар Odoo'даги Meta Ads билан бир хил. Карточкани судрасангиз, Odoo'да ҳам ўзгаради.{% else %}{{ total }} та ариза.{% endif %}</p>
   </div>
   <div class="actions">
     <div class="seg" role="tablist" aria-label="Кўриниш">
       <a href="?view=board&q={{ q|urlencode }}&d={{ period }}" class="{% if view == 'board' %}on{% endif %}">Доска</a>
       <a href="?view=list&q={{ q|urlencode }}&d={{ period }}" class="{% if view == 'list' %}on{% endif %}">Рўйхат</a>
     </div>
+    <form method="post">{% csrf_token %}<button class="btn" title="Odoo'да ўзгарган босқичларни ҳозир олиш"><svg class="i"><use href="#i-refresh"/></svg>Odoo'дан янгилаш</button></form>
     {% if user.is_superuser %}<a class="btn" href="{% url 'panel:leads_csv' %}?q={{ q|urlencode }}&d={{ period }}"><svg class="i"><use href="#i-down"/></svg>Excel'га</a>{% endif %}
   </div>
 </div>
@@ -24,13 +25,15 @@
   <div class="seg">{% for k, v in periods.items %}<a href="?view={{ view }}&q={{ q|urlencode }}&d={{ k }}" class="{% if k == period %}on{% endif %}">{{ v }}</a>{% endfor %}</div>
 </form>
 
-{% if view == 'board' %}
-<div class="col-tabs"><div class="seg">{% for c in columns %}<button type="button" data-col="{{ c.key }}" class="{% if forloop.first %}on{% endif %}">{{ c.name }} <span class="n muted">{{ c.count }}</span></button>{% endfor %}</div></div>
+{% if sync_error %}<div class="alert bad"><svg class="i"><use href="#i-alert"/></svg><span>{{ sync_error }}</span><a class="btn btn-s" href="{% url 'panel:settings' %}">Созламалар</a></div>{% endif %}
+{% if view == 'board' and not columns %}
+<div class="card empty"><b>Босқичлар ҳали Odoo'дан олинмаган</b>Созламаларда Odoo фойдаланувчи API калитини киритинг — босқичлар ва аризалар шу заҳоти жойлашади.</div>
+{% elif view == 'board' %}
+<div class="col-tabs"><div class="seg">{% for c in columns %}<button type="button" data-col="{{ c.stage.pk }}" class="{% if forloop.first %}on{% endif %}">{{ c.stage.name }} <span class="n muted">{{ c.count }}</span></button>{% endfor %}</div></div>
 <div class="board">
   {% for c in columns %}
-  <section class="column {% if forloop.first %}is-shown{% endif %}" data-status="{{ c.key }}" aria-label="{{ c.name }}">
-    <div class="column-head"><span class="dotc"></span><b>{{ c.name }}</b><span class="n">{{ c.count }}</span></div>
-    <div class="column-hint">{{ c.hint }}</div>
+  <section class="column {% if forloop.first %}is-shown{% endif %}" data-status="{{ c.stage.pk }}" data-kind="{% if forloop.first %}first{% elif c.stage.is_won %}won{% elif c.stage.is_lost %}lost{% endif %}" aria-label="{{ c.stage.name }}">
+    <div class="column-head"><span class="dotc"></span><b>{{ c.stage.name }}</b><span class="n">{{ c.count }}</span></div>
     <div class="column-body">
       {% for l in c.items %}{% include "panel/_lead_card.html" %}{% endfor %}
     </div>
@@ -42,12 +45,12 @@
 <div class="card">
   {% if page.object_list %}
   <div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Ариза</th><th>Телефон</th><th>Фаолият тури</th><th>Ҳолати</th><th>Юборилди</th><th class="num">Вақти</th></tr></thead>
+    <thead><tr><th>Ариза</th><th>Телефон</th><th>Фаолият тури</th><th>Босқич</th><th>Юборилди</th><th class="num">Вақти</th></tr></thead>
     <tbody>{% for l in page.object_list %}<tr>
       <td><a href="{% url 'panel:lead' l.pk %}" style="font-weight:600;color:var(--ink)">{{ l.name }}</a>{% if l.problem %}<div class="muted" style="font-size:13px">{{ l.problem|truncatechars:60 }}</div>{% endif %}</td>
       <td class="nowrap"><a href="tel:{{ l.phone|tel }}">{{ l.phone|phone }}</a></td>
       <td>{{ l.business|default:"—" }}</td>
-      <td>{% include "panel/_status_pill.html" %}</td>
+      <td>{% include "panel/_status_pill.html" with st=l.stage %}</td>
       <td class="nowrap">{% if l.sync_error %}<span class="pill bad" title="{{ l.sync_error }}">Хато</span>{% else %}{% if l.tg_sent %}<span class="pill">Telegram</span>{% endif %} {% if l.odoo_id is not None %}<span class="pill">CRM</span>{% endif %}{% endif %}</td>
       <td class="num">{{ l.created|ago }}</td>
     </tr>{% endfor %}</tbody>

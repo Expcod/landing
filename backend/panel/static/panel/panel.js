@@ -12,7 +12,12 @@
     var headers = { 'X-CSRFToken': csrf(), 'X-Requested-With': 'fetch' };
     if (json) headers['Content-Type'] = 'application/json';
     return fetch(url, { method: 'POST', headers: headers, body: json ? JSON.stringify(body) : body, credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) throw new Error(d.error || ('Сервер хатоси: ' + r.status));
+          return d;
+        });
+      });
   }
   function toast(text, kind) {
     var box = $('.toasts');
@@ -88,14 +93,17 @@
   // ---------- Аризалар канбани ----------
   function setStatus(card, status, from) {
     var url = card.dataset.statusUrl;
-    var fd = new FormData(); fd.append('status', status);
+    var fd = new FormData(); fd.append('stage', status);
     return post(url, fd).then(function (r) {
       var sel = $('select[data-status]', card); if (sel) sel.value = status;
       recount();
       toast('«' + card.dataset.name + '» → ' + r.label);
-    }).catch(function () {
-      toast('Ҳолатни сақлаб бўлмади. Саҳифани янгилаб, қайта уриниб кўринг.', 'error');
-      if (from) from.appendChild(card);
+    }).catch(function (e) {
+      toast(e.message || 'Босқични сақлаб бўлмади.', 'error');
+      if (from) from.insertBefore(card, from.firstChild);
+      var sel = $('select[data-status]', card);
+      if (sel && from) sel.value = from.closest('.column').dataset.status;
+      recount();
     });
   }
   function recount() {
@@ -135,11 +143,13 @@
   // Ариза саҳифасида ҳолат тугмалари
   $$('.status-pick button').forEach(function (b) {
     b.addEventListener('click', function () {
-      var fd = new FormData(); fd.append('status', b.dataset.value);
+      var fd = new FormData(); fd.append('stage', b.dataset.value);
+      b.disabled = true;
       post(b.closest('.status-pick').dataset.url, fd).then(function (r) {
         $$('.status-pick button').forEach(function (x) { x.classList.toggle('on', x === b); });
-        toast('Ҳолат: ' + r.label);
-      }).catch(function () { toast('Ҳолатни сақлаб бўлмади.', 'error'); });
+        toast('Босқич: ' + r.label);
+      }).catch(function (e) { toast(e.message || 'Босқични сақлаб бўлмади.', 'error'); })
+        .then(function () { b.disabled = false; });
     });
   });
 
