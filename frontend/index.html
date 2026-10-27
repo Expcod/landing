@@ -734,8 +734,8 @@ window.ncGoal = function (name, params) {
 <div id="formOk" style="display: flex; flex-direction: column; gap: 14px; align-items: flex-start; padding: 12px 0">
 <div style="width: 56px; height: 56px; border-radius: 999px; background: #E6F7EF; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#23A575" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div>
 <div style="font-size: 22px; font-weight: 800">Аризангиз қабул қилинди</div>
-<div class="muted" style="font-size: 15px; line-height: 1.6">Мутахассисимиз тез орада қўнғироқ қилади. Ҳозир Instagram саҳифамизга ўтасиз — у ерда заводлардан видеолар бор.</div>
-<a href="https://www.instagram.com/komron_ayti/" class="btn" style="width: 100%">Instagram'га ўтиш</a>
+<div class="muted" style="font-size: 15px; line-height: 1.6">Мутахассисимиз тез орада қўнғироқ қилади.</div>
+<a href="/rahmat/" class="btn" style="width: 100%">Давом этиш</a>
 </div>
 
 </div>
@@ -929,7 +929,8 @@ class Component extends DCLogic {
 /* Аризаларни қабул қиладиган манзил (сервер, Odoo CRM ёки Telegram бот учун ўз API'нгиз).
    Бўш қолса, ариза ҳеч қаерга юборилмайди — фақат «қабул қилинди» ойнаси чиқади. */
 var LEAD_ENDPOINT = '/api/lead/';
-var INSTAGRAM_URL = 'https://www.instagram.com/komron_ayti/';
+// Ариза серверда сақлангандан кейин шу саҳифага ўтилади.
+var THANKS_URL = '/rahmat/';
 
 (function () {
   var comp = new Component({});
@@ -973,14 +974,45 @@ var INSTAGRAM_URL = 'https://www.instagram.com/komron_ayti/';
     show(err, false);
     var lead = { name: name, phone: phone, business: $('#f-type').value, problem: $('#f-prob').value, page: location.href, time: new Date().toISOString() };
     try { lead.sid = window.sessionStorage.getItem('nc_sid') || ''; } catch (x) {}
-    if (LEAD_ENDPOINT) {
-      try { fetch(LEAD_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); } catch (x) {}
-    }
-    if (window.fbq) { try { window.fbq('track', 'Lead'); } catch (x) {} }
-    if (window.ncGoal) window.ncGoal('lead_sent', { business: lead.business });
-    show(form, false); show(ok, true);
-    setTimeout(function () { window.location.href = INSTAGRAM_URL; }, 2500);
+    if (sending) return;
+    sending = true;
+    var btn = form.querySelector('[type=submit]'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Юборилмоқда…';
+
+    // Ариза серверда сақланмагунча саҳифадан чиқилмайди ва Facebook'га «Lead» юборилмайди:
+    // аввал жавоб кутилмас эди, секин интернетда ариза йўқолиб, Facebook эса уни санаб қоларди.
+    send(lead, 2).then(function () {
+      if (window.fbq) { try { window.fbq('track', 'Lead'); } catch (x) {} }
+      if (window.ncGoal) window.ncGoal('lead_sent', { business: lead.business });
+      show(form, false); show(ok, true);
+      setTimeout(function () { window.location.href = THANKS_URL; }, 400);
+    }).catch(function (status) {
+      sending = false;
+      btn.disabled = false; btn.textContent = label;
+      err.textContent = status === 429
+        ? 'Бир соатда жуда кўп ариза юборилди. Илтимос, қўнғироқ қилинг: +998 33 771 23 23.'
+        : 'Аризани юбориб бўлмади. Интернетни текшириб, тугмани яна босинг ёки қўнғироқ қилинг: +998 33 771 23 23.';
+      show(err, true);
+    });
   });
+
+  var sending = false;
+  function send(lead, tries) {
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = ctrl && setTimeout(function () { ctrl.abort(); }, 15000);
+    return fetch(LEAD_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead),
+      keepalive: true, signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) {
+      if (timer) clearTimeout(timer);
+      if (!r.ok) throw r.status;
+    }, function () {
+      if (timer) clearTimeout(timer);
+      // Тармоқ узилди ёки вақт тугади — бир марта қайта уринамиз
+      if (tries > 1) return new Promise(function (ok) { setTimeout(ok, 1500); }).then(function () { return send(lead, tries - 1); });
+      throw 0;
+    });
+  }
 })();
 
 </script>
